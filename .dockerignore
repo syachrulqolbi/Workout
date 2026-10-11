@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+coverage
+playwright-report
+test-results
+.env*
+*.log
+*.tsbuildinfo
+E2E_TESTING.md
+CLAUDE.md

@@ -1,0 +1,62 @@
+substitutions:
+  _REGION: asia-southeast1
+  _SERVICE: workout
+  _REPOSITORY: portfolio-apps
+  _FIRESTORE_DATABASE_ID: form-workout
+  _FIRESTORE_COLLECTION: form-workspaces
+  _WORKOUT_USERS_COLLECTION: workout-users
+  _WORKOUT_AUDIT_COLLECTION: workout-audit
+  _WORKOUT_RATE_LIMIT_COLLECTION: workout-rate-limits
+  _SITE_URL: https://workout.sqnsportfolio.com
+  _SERVICE_ACCOUNT: workout-runtime@personal-project-414620.iam.gserviceaccount.com
+  _CLEANUP_SERVICE_ACCOUNT: workout-cleanup@personal-project-414620.iam.gserviceaccount.com
+  _ADMIN_EMAIL: syachrulqolbinursepti@gmail.com
+
+steps:
+  - id: container
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    secretEnv:
+      - NEXT_PUBLIC_FIREBASE_API_KEY
+    args:
+      - -c
+      - |
+        docker build \
+          --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="$$NEXT_PUBLIC_FIREBASE_API_KEY" \
+          --tag "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID" \
+          .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --service-account=${_SERVICE_ACCOUNT}
+      - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,FIRESTORE_DATABASE_ID=${_FIRESTORE_DATABASE_ID},FIRESTORE_COLLECTION=${_FIRESTORE_COLLECTION},WORKOUT_USERS_COLLECTION=${_WORKOUT_USERS_COLLECTION},WORKOUT_AUDIT_COLLECTION=${_WORKOUT_AUDIT_COLLECTION},WORKOUT_RATE_LIMIT_COLLECTION=${_WORKOUT_RATE_LIMIT_COLLECTION},NEXT_PUBLIC_SITE_URL=${_SITE_URL},ADMIN_EMAIL=${_ADMIN_EMAIL},CLEANUP_SERVICE_ACCOUNT=${_CLEANUP_SERVICE_ACCOUNT},CLEANUP_AUDIENCE=${_SITE_URL}/api/maintenance/cleanup
+      - --min=0
+      - --max=3
+      - --memory=512Mi
+      - --cpu=1
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/workout-firebase-web-api-key/versions/latest
+      env: NEXT_PUBLIC_FIREBASE_API_KEY
+
+options:
+  logging: CLOUD_LOGGING_ONLY
