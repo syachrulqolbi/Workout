@@ -18,7 +18,7 @@ test('privacy information and PWA manifest are available', async ({ page, reques
   const serviceWorker = await request.get('/sw.js');
   expect(serviceWorker.ok()).toBe(true);
   expect(serviceWorker.headers()['cache-control']).toContain('no-cache');
-  expect(await serviceWorker.text()).toContain("workout-shell-v2");
+  expect(await serviceWorker.text()).toContain("workout-shell-v3");
 });
 
 test('private workout data rejects unauthenticated browser requests', async ({ request }) => {

@@ -5,7 +5,17 @@ import dynamic from 'next/dynamic';
 import {
   ArrowRight, CalendarDays, Check, Database, Dumbbell, LogIn,
 } from 'lucide-react';
-import { browserLocalPersistence, getRedirectResult, onAuthStateChanged, setPersistence, signInWithRedirect, signOut, type User } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  browserSessionPersistence,
+  getRedirectResult,
+  onAuthStateChanged,
+  setPersistence,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  type User,
+} from 'firebase/auth';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { MobileNav, Sidebar, type SyncState, type View } from '@/features/workout/components/app-navigation';
 import { Dashboard } from '@/features/workout/components/dashboard';
@@ -41,40 +51,117 @@ const WorkoutModal = dynamic(() => import('@/features/workout/components/workout
 
 const RECOVERY_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SAVE_DEBOUNCE_MS = 2_000;
+const AUTH_STARTUP_TIMEOUT_MS = 15_000;
+
+function authErrorCode(cause: unknown) {
+  if (!cause || typeof cause !== 'object' || !('code' in cause)) return '';
+  return typeof cause.code === 'string' ? cause.code : '';
+}
+
+function authErrorMessage(cause: unknown) {
+  const code = authErrorCode(cause);
+  switch (code) {
+    case 'auth/popup-closed-by-user':
+      return 'The Google sign-in window was closed. Please try again.';
+    case 'auth/network-request-failed':
+      return 'Google sign-in could not reach the network. Check your connection and try again.';
+    case 'auth/unauthorized-domain':
+      return 'This Workout domain is not authorized for Google sign-in.';
+    case 'auth/web-storage-unsupported':
+      return 'Safari blocked the storage needed for sign-in. Open Workout in a normal Safari tab and try again.';
+    case 'auth/invalid-api-key':
+      return 'Workout could not verify its Google sign-in configuration. Please refresh and try again.';
+    default:
+      return code
+        ? `Google sign-in could not be completed (${code}). Please refresh and try again.`
+        : 'Google sign-in could not be completed. Please refresh and try again.';
+  }
+}
+
+async function configureAuthPersistence() {
+  try {
+    await setPersistence(firebaseAuth, browserLocalPersistence);
+  } catch {
+    await setPersistence(firebaseAuth, browserSessionPersistence);
+  }
+}
 
 export function WorkoutApplication() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
-    const fallback = window.setTimeout(() => setAuthReady(true), 6_000);
+    let active = true;
+    let redirectSettled = false;
+    let observedUser = firebaseAuth.currentUser;
+    const fallback = window.setTimeout(() => {
+      if (!active) return;
+      setAuthError('Google sign-in is taking longer than expected. Please refresh and try again.');
+      setUser(firebaseAuth.currentUser ?? observedUser);
+      setAuthReady(true);
+    }, AUTH_STARTUP_TIMEOUT_MS);
     const unsubscribe = onAuthStateChanged(firebaseAuth, (nextUser) => {
-      window.clearTimeout(fallback);
+      observedUser = nextUser;
+      if (!active) return;
       setUser(nextUser);
-      setAuthReady(true);
+      if (nextUser || redirectSettled) {
+        window.clearTimeout(fallback);
+        setAuthReady(true);
+      }
     });
-    void getRedirectResult(firebaseAuth).catch((cause) => {
-      const message = cause instanceof Error ? cause.message : '';
-      if (!message.includes('redirect-cancelled-by-user')) setAuthError('Google sign-in could not be completed. Please try again.');
-      setAuthReady(true);
-    });
-    return () => { window.clearTimeout(fallback); unsubscribe(); };
+    void getRedirectResult(firebaseAuth)
+      .then((result) => {
+        if (!active) return;
+        setUser(result?.user ?? firebaseAuth.currentUser ?? observedUser);
+      })
+      .catch((cause) => {
+        if (!active || authErrorCode(cause) === 'auth/redirect-cancelled-by-user') return;
+        setAuthError(authErrorMessage(cause));
+      })
+      .finally(() => {
+        redirectSettled = true;
+        if (!active) return;
+        window.clearTimeout(fallback);
+        setUser((current) => firebaseAuth.currentUser ?? observedUser ?? current);
+        setAuthReady(true);
+      });
+    return () => {
+      active = false;
+      window.clearTimeout(fallback);
+      unsubscribe();
+    };
   }, []);
 
   async function handleSignIn() {
+    if (signingIn) return;
     setAuthError('');
+    setSigningIn(true);
     try {
-      await setPersistence(firebaseAuth, browserLocalPersistence);
-      await signInWithRedirect(firebaseAuth, googleProvider);
+      await configureAuthPersistence();
+      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      setUser(result.user);
+      setAuthReady(true);
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : '';
-      if (!message.includes('redirect-cancelled-by-user')) setAuthError('Google sign-in could not be completed. Please try again.');
+      const code = authErrorCode(cause);
+      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+        try {
+          await signInWithRedirect(firebaseAuth, googleProvider);
+          return;
+        } catch (redirectCause) {
+          setAuthError(authErrorMessage(redirectCause));
+        }
+      } else if (code !== 'auth/cancelled-popup-request') {
+        setAuthError(authErrorMessage(cause));
+      }
+    } finally {
+      setSigningIn(false);
     }
   }
 
   if (!authReady) return <AuthLoading />;
-  if (!user) return <LandingPage signIn={handleSignIn} error={authError} />;
+  if (!user) return <LandingPage signIn={handleSignIn} error={authError} signingIn={signingIn} />;
   return <WorkoutApp user={user} signOutUser={() => signOut(firebaseAuth)} />;
 }
 
@@ -82,19 +169,19 @@ function AuthLoading() {
   return <main className="auth-loading"><span className="brand-mark"><Dumbbell size={18} /></span><p>Loading Workout…</p></main>;
 }
 
-function LandingPage({ signIn, error }: { signIn: () => void; error: string }) {
+function LandingPage({ signIn, error, signingIn }: { signIn: () => void; error: string; signingIn: boolean }) {
   return (
     <main className="landing-shell">
       <nav className="landing-nav" aria-label="Landing navigation">
         <div className="brand"><span className="brand-mark"><Dumbbell size={16} strokeWidth={2.4} /></span><span>WORKOUT</span></div>
-        <button className="landing-sign-in" onClick={signIn}><LogIn size={17} /> Sign in</button>
+        <button className="landing-sign-in" onClick={signIn} disabled={signingIn} aria-busy={signingIn}><LogIn size={17} /> {signingIn ? 'Signing in…' : 'Sign in'}</button>
       </nav>
       <section className="landing-hero">
         <div className="landing-copy">
           <span className="eyebrow">TRAIN WITH INTENTION</span>
           <h1>Progress you<br />can prove.</h1>
           <p>A focused space for strength, cardio, meals and the small wins that become lasting progress.</p>
-          <button className="google-button" onClick={signIn}><span aria-hidden="true">G</span> Continue with Google <ArrowRight size={18} /></button>
+          <button className="google-button" onClick={signIn} disabled={signingIn} aria-busy={signingIn}><span aria-hidden="true">G</span> {signingIn ? 'Opening Google…' : 'Continue with Google'} <ArrowRight size={18} /></button>
           {error && <p className="auth-error" role="alert">{error}</p>}
           <small>Private by account. Your training history stays yours.</small>
         </div>

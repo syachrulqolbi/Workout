@@ -1,4 +1,4 @@
-const CACHE_NAME = 'workout-shell-v2';
+const CACHE_NAME = 'workout-shell-v3';
 const APP_SHELL = ['/', '/privacy', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -25,7 +25,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (['style', 'script', 'image', 'font'].includes(request.destination)) {
+  if (request.destination === 'script') {
+    const refreshed = fetch(request).then(async (response) => {
+      if (response.ok) {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(request, response.clone());
+      }
+      return response;
+    });
+    event.respondWith(refreshed.catch(async () => (await caches.match(request)) || Response.error()));
+    return;
+  }
+
+  if (['style', 'image', 'font'].includes(request.destination)) {
     const refreshed = fetch(request).then(async (response) => {
       if (response.ok) {
         const cache = await caches.open(CACHE_NAME);
