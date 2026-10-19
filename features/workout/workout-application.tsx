@@ -52,7 +52,9 @@ const WorkoutModal = dynamic(() => import('@/features/workout/components/workout
 const RECOVERY_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SAVE_DEBOUNCE_MS = 2_000;
 const AUTH_STARTUP_TIMEOUT_MS = 8_000;
+const AUTH_REDIRECT_TIMEOUT_MS = 20_000;
 const AUTH_REDIRECT_PENDING_KEY = 'workout-google-redirect-pending';
+const AUTH_REDIRECT_QUERY_KEY = 'authReturn';
 
 function authErrorCode(cause: unknown) {
   if (!cause || typeof cause !== 'object' || !('code' in cause)) return '';
@@ -64,6 +66,8 @@ function authErrorMessage(cause: unknown) {
   switch (code) {
     case 'auth/popup-closed-by-user':
       return 'The Google sign-in window was closed. Please try again.';
+    case 'auth/cancelled-popup-request':
+      return 'Google sign-in was interrupted. Please try again.';
     case 'auth/network-request-failed':
       return 'Google sign-in could not reach the network. Check your connection and try again.';
     case 'auth/unauthorized-domain':
@@ -88,28 +92,59 @@ async function configureAuthPersistence() {
 }
 
 function hasPendingAuthRedirect() {
+  const redirectMarkedInUrl = new URL(window.location.href).searchParams.get(AUTH_REDIRECT_QUERY_KEY) === 'google';
+  if (redirectMarkedInUrl) return true;
   try {
-    return window.sessionStorage.getItem(AUTH_REDIRECT_PENDING_KEY) === '1';
+    return window.sessionStorage.getItem(AUTH_REDIRECT_PENDING_KEY) === '1'
+      || window.localStorage.getItem(AUTH_REDIRECT_PENDING_KEY) === '1';
   } catch {
     return false;
   }
 }
 
 function markPendingAuthRedirect() {
+  let marked = false;
   try {
     window.sessionStorage.setItem(AUTH_REDIRECT_PENDING_KEY, '1');
-    return true;
+    window.localStorage.setItem(AUTH_REDIRECT_PENDING_KEY, '1');
+    marked = true;
   } catch {
-    return false;
+    // The URL marker below still works when Safari disables web storage.
   }
+  try {
+    const redirectUrl = new URL(window.location.href);
+    redirectUrl.searchParams.set(AUTH_REDIRECT_QUERY_KEY, 'google');
+    window.history.replaceState(window.history.state, '', redirectUrl);
+    marked = true;
+  } catch {
+    // A storage marker is sufficient when History API access is unavailable.
+  }
+  return marked;
 }
 
 function clearPendingAuthRedirect() {
   try {
     window.sessionStorage.removeItem(AUTH_REDIRECT_PENDING_KEY);
+    window.localStorage.removeItem(AUTH_REDIRECT_PENDING_KEY);
   } catch {
     // Safari may disable web storage under strict privacy settings.
   }
+  try {
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete(AUTH_REDIRECT_QUERY_KEY);
+    window.history.replaceState(window.history.state, '', cleanUrl);
+  } catch {
+    // The marker will be replaced on the next successful navigation.
+  }
+}
+
+function prefersRedirectSignIn() {
+  const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
+  const touchEnabledIPad = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  return window.matchMedia('(display-mode: standalone)').matches
+    || navigatorWithStandalone.standalone === true
+    || touchEnabledIPad
+    || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 }
 
 export function WorkoutApplication() {
@@ -123,13 +158,18 @@ export function WorkoutApplication() {
     const redirectPending = hasPendingAuthRedirect();
     const fallback = window.setTimeout(() => {
       if (!active) return;
+      if (redirectPending) {
+        clearPendingAuthRedirect();
+        setAuthError('Google sign-in returned but the session could not be completed. Please try again.');
+      }
       setUser(firebaseAuth.currentUser);
       setAuthReady(true);
-    }, AUTH_STARTUP_TIMEOUT_MS);
+    }, redirectPending ? AUTH_REDIRECT_TIMEOUT_MS : AUTH_STARTUP_TIMEOUT_MS);
     const unsubscribe = onAuthStateChanged(firebaseAuth, (nextUser) => {
       if (!active) return;
       setUser(nextUser);
       if (nextUser || !redirectPending) {
+        if (nextUser) clearPendingAuthRedirect();
         window.clearTimeout(fallback);
         setAuthReady(true);
       }
@@ -163,12 +203,27 @@ export function WorkoutApplication() {
     if (signingIn) return;
     setAuthError('');
     setSigningIn(true);
+    let redirectAttempted = false;
     try {
       await configureAuthPersistence();
+      if (prefersRedirectSignIn()) {
+        redirectAttempted = true;
+        if (!markPendingAuthRedirect()) {
+          setAuthError('Safari blocked the storage needed for sign-in. Reduce protections for this site, then try again.');
+          return;
+        }
+        await signInWithRedirect(firebaseAuth, googleProvider);
+        return;
+      }
       const result = await signInWithPopup(firebaseAuth, googleProvider);
       setUser(result.user);
       setAuthReady(true);
     } catch (cause) {
+      if (redirectAttempted) {
+        clearPendingAuthRedirect();
+        setAuthError(authErrorMessage(cause));
+        return;
+      }
       const code = authErrorCode(cause);
       if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
         if (!markPendingAuthRedirect()) {
@@ -182,7 +237,7 @@ export function WorkoutApplication() {
           clearPendingAuthRedirect();
           setAuthError(authErrorMessage(redirectCause));
         }
-      } else if (code !== 'auth/cancelled-popup-request') {
+      } else {
         setAuthError(authErrorMessage(cause));
       }
     } finally {
