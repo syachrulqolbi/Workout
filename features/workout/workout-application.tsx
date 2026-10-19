@@ -6,11 +6,8 @@ import {
   ArrowRight, CalendarDays, Check, Database, Dumbbell, LogIn,
 } from 'lucide-react';
 import {
-  browserLocalPersistence,
-  browserSessionPersistence,
   getRedirectResult,
   onAuthStateChanged,
-  setPersistence,
   signInWithPopup,
   signInWithRedirect,
   signOut,
@@ -80,14 +77,6 @@ function authErrorMessage(cause: unknown) {
       return code
         ? `Google sign-in could not be completed (${code}). Please refresh and try again.`
         : 'Google sign-in could not be completed. Please refresh and try again.';
-  }
-}
-
-async function configureAuthPersistence() {
-  try {
-    await setPersistence(firebaseAuth, browserLocalPersistence);
-  } catch {
-    await setPersistence(firebaseAuth, browserSessionPersistence);
   }
 }
 
@@ -205,7 +194,6 @@ export function WorkoutApplication() {
     setSigningIn(true);
     let redirectAttempted = false;
     try {
-      await configureAuthPersistence();
       if (prefersRedirectSignIn()) {
         redirectAttempted = true;
         if (!markPendingAuthRedirect()) {
