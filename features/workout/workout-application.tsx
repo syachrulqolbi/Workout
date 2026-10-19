@@ -51,7 +51,8 @@ const WorkoutModal = dynamic(() => import('@/features/workout/components/workout
 
 const RECOVERY_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SAVE_DEBOUNCE_MS = 2_000;
-const AUTH_STARTUP_TIMEOUT_MS = 15_000;
+const AUTH_STARTUP_TIMEOUT_MS = 8_000;
+const AUTH_REDIRECT_PENDING_KEY = 'workout-google-redirect-pending';
 
 function authErrorCode(cause: unknown) {
   if (!cause || typeof cause !== 'object' || !('code' in cause)) return '';
@@ -86,6 +87,31 @@ async function configureAuthPersistence() {
   }
 }
 
+function hasPendingAuthRedirect() {
+  try {
+    return window.sessionStorage.getItem(AUTH_REDIRECT_PENDING_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markPendingAuthRedirect() {
+  try {
+    window.sessionStorage.setItem(AUTH_REDIRECT_PENDING_KEY, '1');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearPendingAuthRedirect() {
+  try {
+    window.sessionStorage.removeItem(AUTH_REDIRECT_PENDING_KEY);
+  } catch {
+    // Safari may disable web storage under strict privacy settings.
+  }
+}
+
 export function WorkoutApplication() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -94,39 +120,38 @@ export function WorkoutApplication() {
 
   useEffect(() => {
     let active = true;
-    let redirectSettled = false;
-    let observedUser = firebaseAuth.currentUser;
+    const redirectPending = hasPendingAuthRedirect();
     const fallback = window.setTimeout(() => {
       if (!active) return;
-      setAuthError('Google sign-in is taking longer than expected. Please refresh and try again.');
-      setUser(firebaseAuth.currentUser ?? observedUser);
+      setUser(firebaseAuth.currentUser);
       setAuthReady(true);
     }, AUTH_STARTUP_TIMEOUT_MS);
     const unsubscribe = onAuthStateChanged(firebaseAuth, (nextUser) => {
-      observedUser = nextUser;
       if (!active) return;
       setUser(nextUser);
-      if (nextUser || redirectSettled) {
+      if (nextUser || !redirectPending) {
         window.clearTimeout(fallback);
         setAuthReady(true);
       }
     });
-    void getRedirectResult(firebaseAuth)
-      .then((result) => {
-        if (!active) return;
-        setUser(result?.user ?? firebaseAuth.currentUser ?? observedUser);
-      })
-      .catch((cause) => {
-        if (!active || authErrorCode(cause) === 'auth/redirect-cancelled-by-user') return;
-        setAuthError(authErrorMessage(cause));
-      })
-      .finally(() => {
-        redirectSettled = true;
-        if (!active) return;
-        window.clearTimeout(fallback);
-        setUser((current) => firebaseAuth.currentUser ?? observedUser ?? current);
-        setAuthReady(true);
-      });
+    if (redirectPending) {
+      void getRedirectResult(firebaseAuth)
+        .then((result) => {
+          if (!active) return;
+          setUser(result?.user ?? firebaseAuth.currentUser);
+        })
+        .catch((cause) => {
+          if (!active || authErrorCode(cause) === 'auth/redirect-cancelled-by-user') return;
+          setAuthError(authErrorMessage(cause));
+        })
+        .finally(() => {
+          clearPendingAuthRedirect();
+          if (!active) return;
+          window.clearTimeout(fallback);
+          setUser((current) => firebaseAuth.currentUser ?? current);
+          setAuthReady(true);
+        });
+    }
     return () => {
       active = false;
       window.clearTimeout(fallback);
@@ -146,10 +171,15 @@ export function WorkoutApplication() {
     } catch (cause) {
       const code = authErrorCode(cause);
       if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+        if (!markPendingAuthRedirect()) {
+          setAuthError('Safari blocked the storage needed for sign-in. Allow pop-ups or reduce protections for this site, then try again.');
+          return;
+        }
         try {
           await signInWithRedirect(firebaseAuth, googleProvider);
           return;
         } catch (redirectCause) {
+          clearPendingAuthRedirect();
           setAuthError(authErrorMessage(redirectCause));
         }
       } else if (code !== 'auth/cancelled-popup-request') {
