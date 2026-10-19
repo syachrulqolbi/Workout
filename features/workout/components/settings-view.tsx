@@ -1,8 +1,8 @@
 'use client';
 
-import type { User } from 'firebase/auth';
 import { LogOut, RotateCcw, Search, ShieldCheck, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import type { AppUser } from '@/lib/auth-user';
 import { authenticatedFetch } from '@/lib/client/authenticated-fetch';
 import { accountInitials, formatDate } from '@/lib/workout-ui';
 
@@ -21,16 +21,16 @@ type AdminUser = {
 };
 
 export function SettingsView({ user, reset, signOutUser, isAdmin, clearLocalHistory }: {
-  user: User;
+  user: AppUser;
   reset: () => void;
   signOutUser: () => void;
   isAdmin: boolean;
   clearLocalHistory: () => void;
 }) {
-  return <div className="settings-grid"><section className="card account-card"><span className="avatar large">{accountInitials(user.displayName, user.email)}</span><div><span className="muted-label">SIGNED IN WITH GOOGLE</span><h2>{user.displayName || 'Workout user'}</h2><p>{user.email}</p></div><button className="secondary-button inline" onClick={signOutUser}><LogOut size={16} /> Sign out</button></section><section className="card privacy-card"><ShieldCheck size={24} /><div><span className="muted-label">PRIVATE BY ACCOUNT</span><h3>Your data belongs to this Google account.</h3><p>The server verifies your Google identity on every read and write. Workout data is automatically deleted after 30 days without account activity.</p></div></section><section className="card danger-card"><div><span className="muted-label">RESET MY DATA</span><h3>Set everything back to zero</h3><p>Clear workout history, exercise progress, meal plans, weekday exercise plans and any active workout. This cannot be undone.</p></div><button className="danger-button" onClick={reset}><RotateCcw size={16} /> Reset everything</button></section>{isAdmin && <section className="admin-settings"><div className="admin-section-heading"><span className="admin-shield"><ShieldCheck size={19} /></span><div><span className="muted-label">VERIFIED ADMINISTRATOR</span><h2>User data summary</h2><p>Server-authorized access for {user.email}</p></div></div><AdminView user={user} clearLocalHistory={clearLocalHistory} /></section>}</div>;
+  return <div className="settings-grid"><section className="card account-card"><span className="avatar large">{accountInitials(user.displayName, user.email)}</span><div><span className="muted-label">SIGNED IN WITH GOOGLE</span><h2>{user.displayName || 'Workout user'}</h2><p>{user.email}</p></div><button className="secondary-button inline" onClick={signOutUser}><LogOut size={16} /> Sign out</button></section><section className="card privacy-card"><ShieldCheck size={24} /><div><span className="muted-label">PRIVATE BY ACCOUNT</span><h3>Your data belongs to this Google account.</h3><p>The server verifies your protected account session on every read and write. Workout data is automatically deleted after 30 days without account activity.</p></div></section><section className="card danger-card"><div><span className="muted-label">RESET MY DATA</span><h3>Set everything back to zero</h3><p>Clear workout history, exercise progress, meal plans, weekday exercise plans and any active workout. This cannot be undone.</p></div><button className="danger-button" onClick={reset}><RotateCcw size={16} /> Reset everything</button></section>{isAdmin && <section className="admin-settings"><div className="admin-section-heading"><span className="admin-shield"><ShieldCheck size={19} /></span><div><span className="muted-label">VERIFIED ADMINISTRATOR</span><h2>User data summary</h2><p>Server-authorized access for {user.email}</p></div></div><AdminView user={user} clearLocalHistory={clearLocalHistory} /></section>}</div>;
 }
 
-function AdminView({ user, clearLocalHistory }: { user: User; clearLocalHistory: () => void }) {
+function AdminView({ clearLocalHistory }: { user: AppUser; clearLocalHistory: () => void }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -41,7 +41,7 @@ function AdminView({ user, clearLocalHistory }: { user: User; clearLocalHistory:
   const load = useCallback(async () => {
     setStatus('loading');
     try {
-      const response = await authenticatedFetch(user, '/api/admin/users', { cache: 'no-store' });
+      const response = await authenticatedFetch('/api/admin/users', { cache: 'no-store' });
       if (!response.ok) throw new Error('Admin data could not be loaded.');
       const payload = await response.json() as { users: AdminUser[]; totalCount: number; truncated: boolean };
       setUsers(payload.users);
@@ -49,7 +49,7 @@ function AdminView({ user, clearLocalHistory }: { user: User; clearLocalHistory:
       setTruncated(payload.truncated);
       setStatus('ready');
     } catch { setStatus('error'); }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => void load(), 0);
@@ -58,7 +58,7 @@ function AdminView({ user, clearLocalHistory }: { user: User; clearLocalHistory:
 
   async function deleteOwnHistory() {
     if (!window.confirm('Delete your own workout and exercise history? Meal and exercise plans will stay.')) return;
-    const response = await authenticatedFetch(user, '/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete-own-history' }) });
+    const response = await authenticatedFetch('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete-own-history' }) });
     if (response.ok) { clearLocalHistory(); window.location.reload(); } else setMessage('Your history could not be deleted.');
   }
 
@@ -66,7 +66,7 @@ function AdminView({ user, clearLocalHistory }: { user: User; clearLocalHistory:
     const phrase = `DELETE ALL HISTORY ${totalCount}`;
     const confirmation = window.prompt(`This permanently deletes workout and exercise history for ${totalCount} users. Meal and exercise plans stay. Type ${phrase} to continue.`);
     if (confirmation !== phrase) return;
-    const response = await authenticatedFetch(user, '/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete-all-history', confirmation }) });
+    const response = await authenticatedFetch('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete-all-history', confirmation }) });
     if (response.ok) { window.location.reload(); } else setMessage('Global history deletion failed.');
   }
 

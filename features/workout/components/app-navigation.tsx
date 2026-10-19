@@ -1,7 +1,7 @@
 'use client';
 
-import type { User } from 'firebase/auth';
 import { CalendarDays, Dumbbell, Flame, History, Home, LogOut, Salad, Settings2, type LucideIcon } from 'lucide-react';
+import type { AppUser } from '@/lib/auth-user';
 import { accountInitials } from '@/lib/workout-ui';
 
 export type View = 'today' | 'history' | 'meals' | 'calendar' | 'settings';
@@ -23,7 +23,7 @@ type NavigationProps = {
 export function Sidebar({ view, navigate, syncState, retrySave, user, signOutUser }: NavigationProps & {
   syncState: SyncState;
   retrySave: () => void;
-  user: User;
+  user: AppUser;
   signOutUser: () => void;
 }) {
   const syncLabel = syncState === 'synced' ? 'Database connected' : syncState === 'syncing' || syncState === 'loading' ? 'Saving securely…' : 'Save needs attention';

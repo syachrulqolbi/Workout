@@ -6,8 +6,10 @@
 flowchart LR
   User[Browser] -->|HTTPS| Domain[workout.sqnsportfolio.com]
   Domain --> Run[Cloud Run: workout]
-  User -->|Google sign-in| Auth[Firebase Authentication]
-  Run -->|Verify Firebase ID token| Auth
+  User -->|Google Identity credential| Google[Google Identity Services]
+  Run -->|Verify Google credential| Google
+  Run -->|Resolve existing UID| Users[(Existing account profile)]
+  Run -->|Secure HttpOnly session| User
   Run -->|UID-scoped server access| Firestore[(Firestore: form-workout)]
   Run -->|On-demand OCR, image not retained| Vision[Cloud Vision API]
   Scheduler[Cloud Scheduler: daily 03:00] -->|OIDC-authenticated POST| Cleanup[/api/maintenance/cleanup]
@@ -20,7 +22,7 @@ flowchart LR
 ## Data and security model
 
 - The public homepage is available without an account. App data requires Google sign-in.
-- Every API request sends a fresh Firebase ID token. The Cloud Run server verifies it and derives the Firestore document ID from the verified Google UID; the browser cannot select another user document.
+- Google Identity Services returns the verified credential directly to the page without Firebase redirect state or browser storage. Cloud Run verifies the credential, matches a returning account to its existing UID by verified email, and issues a signed, `HttpOnly`, `Secure`, `SameSite=Lax` first-party session cookie. The browser cannot read the cookie or select another Firestore document.
 - Each user has one compact `workout-users/{uid}` document for plans, dated schedule overrides and active-workout state. Completed sessions, exercise history and meals are stored in UID-scoped subcollections so history growth cannot exceed Firestore's single-document limit. Existing embedded records migrate automatically on first read.
 - Saves use a server revision and Firestore update precondition. Concurrent edits from another tab or device are merged by data area (plan, schedule, active workout, history or meals) instead of silently overwriting the whole account.
 - The admin email is checked from the verified server-side token. Admin table reads and personal/global history deletions are recorded in `workout-audit`; client-side UI state is never trusted for authorization.
@@ -56,20 +58,17 @@ flowchart LR
 
 ## One-time authentication configuration
 
-The existing project ID stays `personal-project-414620`; its human-readable Google Cloud project name is `Workout App`. Firebase Authentication and the Google provider remain attached to the existing users and database. Authorized domains include:
+The existing project ID stays `personal-project-414620`; its human-readable Google Cloud project name is `Workout App`. Existing Firestore account profiles remain the stable UID mapping so returning users keep their current data. Google Identity Services uses the existing OAuth web client. Authorized JavaScript origins include:
 
-- `workout.sqnsportfolio.com`
-- `localhost`
-- `personal-project-414620.firebaseapp.com`
+- `https://workout.sqnsportfolio.com`
+- `http://localhost:3000`
+- `http://localhost:3001`
 
-The Firebase SDK uses `workout.sqnsportfolio.com` as `authDomain`. Next.js transparently proxies `/__/auth/*` to the original Firebase hosting helper, so the sign-in flow stays first-party while preserving the same Firebase project. The OAuth web client must keep both existing Finance URLs and add:
-
-- JavaScript origin: `https://workout.sqnsportfolio.com`
-- Redirect URI: `https://workout.sqnsportfolio.com/__/auth/handler`
+No client-side redirect handler is required. The Google button returns an ID credential to the current page, the server verifies it for OAuth client `1039215803832-upctjhdrphp4u0cf1jlh6u4itvglo7i0.apps.googleusercontent.com`, and the signed session secret is injected from Secret Manager as `WORKOUT_SESSION_SECRET`.
 
 Google Auth Platform branding should use app name `Workout`, support/developer email `syachrulqolbinursepti@gmail.com`, home page `https://workout.sqnsportfolio.com/`, privacy policy `https://workout.sqnsportfolio.com/privacy`, authorized domain `sqnsportfolio.com`, and the square dumbbell asset in `public/icons/workout-192.png`. Because the app is currently in Testing status, Google reports that verification is not required; publish/verification rules can change when the audience is moved to Production.
 
-The Firebase browser configuration is public by design. No service-account keys or private OAuth credentials are stored in the repository; server credentials come from Cloud Run Application Default Credentials.
+The Google OAuth client ID is public by design. No service-account keys, OAuth client secrets, or session-signing secrets are stored in the repository; server credentials come from Cloud Run Application Default Credentials and Secret Manager.
 
 ## Production resources
 

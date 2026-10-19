@@ -3,24 +3,17 @@
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import {
-  ArrowRight, CalendarDays, Check, Database, Dumbbell, LogIn,
+  CalendarDays, Check, Database, Dumbbell, LogIn,
 } from 'lucide-react';
-import {
-  getRedirectResult,
-  onAuthStateChanged,
-  signInWithPopup,
-  signInWithRedirect,
-  signOut,
-  type User,
-} from 'firebase/auth';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { MobileNav, Sidebar, type SyncState, type View } from '@/features/workout/components/app-navigation';
 import { Dashboard } from '@/features/workout/components/dashboard';
+import { disableGoogleAutoSelect, GoogleSignInButton } from '@/features/workout/components/google-sign-in-button';
 import type { NutritionDraft } from '@/features/workout/components/meal-modal';
 import { SettingsView } from '@/features/workout/components/settings-view';
+import type { AppUser } from '@/lib/auth-user';
 import { authenticatedFetch } from '@/lib/client/authenticated-fetch';
 import { canonicalExerciseName } from '@/lib/exercise-profile';
-import { firebaseAuth, googleProvider } from '@/lib/client/firebase-client';
 import {
   compactDatePlanOverrides, compactMealCompletionDates, createDefaultWorkoutData, DAY_NAMES, isWorkoutData, normalizeWorkoutData, stableExerciseId,
   type ActiveWorkout, type DayPlan, type LibraryExercise, type Meal,
@@ -49,212 +42,119 @@ const WorkoutModal = dynamic(() => import('@/features/workout/components/workout
 const RECOVERY_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SAVE_DEBOUNCE_MS = 2_000;
 const AUTH_STARTUP_TIMEOUT_MS = 8_000;
-const AUTH_REDIRECT_TIMEOUT_MS = 20_000;
-const AUTH_REDIRECT_PENDING_KEY = 'workout-google-redirect-pending';
-const AUTH_REDIRECT_QUERY_KEY = 'authReturn';
-
-function authErrorCode(cause: unknown) {
-  if (!cause || typeof cause !== 'object' || !('code' in cause)) return '';
-  return typeof cause.code === 'string' ? cause.code : '';
-}
-
-function authErrorMessage(cause: unknown) {
-  const code = authErrorCode(cause);
-  switch (code) {
-    case 'auth/popup-closed-by-user':
-      return 'The Google sign-in window was closed. Please try again.';
-    case 'auth/cancelled-popup-request':
-      return 'Google sign-in was interrupted. Please try again.';
-    case 'auth/network-request-failed':
-      return 'Google sign-in could not reach the network. Check your connection and try again.';
-    case 'auth/unauthorized-domain':
-      return 'This Workout domain is not authorized for Google sign-in.';
-    case 'auth/web-storage-unsupported':
-      return 'Safari blocked the storage needed for sign-in. Open Workout in a normal Safari tab and try again.';
-    case 'auth/invalid-api-key':
-      return 'Workout could not verify its Google sign-in configuration. Please refresh and try again.';
-    default:
-      return code
-        ? `Google sign-in could not be completed (${code}). Please refresh and try again.`
-        : 'Google sign-in could not be completed. Please refresh and try again.';
-  }
-}
-
-function hasPendingAuthRedirect() {
-  const redirectMarkedInUrl = new URL(window.location.href).searchParams.get(AUTH_REDIRECT_QUERY_KEY) === 'google';
-  if (redirectMarkedInUrl) return true;
+function clearLegacyAuthMarkers() {
   try {
-    return window.sessionStorage.getItem(AUTH_REDIRECT_PENDING_KEY) === '1'
-      || window.localStorage.getItem(AUTH_REDIRECT_PENDING_KEY) === '1';
+    window.sessionStorage.removeItem('workout-google-redirect-pending');
+    window.localStorage.removeItem('workout-google-redirect-pending');
   } catch {
-    return false;
-  }
-}
-
-function markPendingAuthRedirect() {
-  let marked = false;
-  try {
-    window.sessionStorage.setItem(AUTH_REDIRECT_PENDING_KEY, '1');
-    window.localStorage.setItem(AUTH_REDIRECT_PENDING_KEY, '1');
-    marked = true;
-  } catch {
-    // The URL marker below still works when Safari disables web storage.
-  }
-  try {
-    const redirectUrl = new URL(window.location.href);
-    redirectUrl.searchParams.set(AUTH_REDIRECT_QUERY_KEY, 'google');
-    window.history.replaceState(window.history.state, '', redirectUrl);
-    marked = true;
-  } catch {
-    // A storage marker is sufficient when History API access is unavailable.
-  }
-  return marked;
-}
-
-function clearPendingAuthRedirect() {
-  try {
-    window.sessionStorage.removeItem(AUTH_REDIRECT_PENDING_KEY);
-    window.localStorage.removeItem(AUTH_REDIRECT_PENDING_KEY);
-  } catch {
-    // Safari may disable web storage under strict privacy settings.
+    // Legacy Firebase markers are optional and Safari can disable web storage.
   }
   try {
     const cleanUrl = new URL(window.location.href);
-    cleanUrl.searchParams.delete(AUTH_REDIRECT_QUERY_KEY);
+    cleanUrl.searchParams.delete('authReturn');
     window.history.replaceState(window.history.state, '', cleanUrl);
   } catch {
-    // The marker will be replaced on the next successful navigation.
+    // The old query marker is harmless if History API access is unavailable.
   }
 }
 
-function prefersRedirectSignIn() {
-  const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
-  const touchEnabledIPad = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
-  return window.matchMedia('(display-mode: standalone)').matches
-    || navigatorWithStandalone.standalone === true
-    || touchEnabledIPad
-    || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-}
-
 export function WorkoutApplication() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState('');
   const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
     let active = true;
-    const redirectPending = hasPendingAuthRedirect();
+    clearLegacyAuthMarkers();
+    const controller = new AbortController();
     const fallback = window.setTimeout(() => {
       if (!active) return;
-      if (redirectPending) {
-        clearPendingAuthRedirect();
-        setAuthError('Google sign-in returned but the session could not be completed. Please try again.');
-      }
-      setUser(firebaseAuth.currentUser);
+      controller.abort();
       setAuthReady(true);
-    }, redirectPending ? AUTH_REDIRECT_TIMEOUT_MS : AUTH_STARTUP_TIMEOUT_MS);
-    const unsubscribe = onAuthStateChanged(firebaseAuth, (nextUser) => {
-      if (!active) return;
-      setUser(nextUser);
-      if (nextUser || !redirectPending) {
-        if (nextUser) clearPendingAuthRedirect();
-        window.clearTimeout(fallback);
-        setAuthReady(true);
-      }
-    });
-    if (redirectPending) {
-      void getRedirectResult(firebaseAuth)
-        .then((result) => {
-          if (!active) return;
-          setUser(result?.user ?? firebaseAuth.currentUser);
-        })
-        .catch((cause) => {
-          if (!active || authErrorCode(cause) === 'auth/redirect-cancelled-by-user') return;
-          setAuthError(authErrorMessage(cause));
-        })
+    }, AUTH_STARTUP_TIMEOUT_MS);
+    void fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin', signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        const payload = await response.json() as { user?: AppUser };
+        return payload.user ?? null;
+      })
+      .then((sessionUser) => {
+        if (active) setUser(sessionUser);
+      })
+      .catch(() => undefined)
         .finally(() => {
-          clearPendingAuthRedirect();
           if (!active) return;
           window.clearTimeout(fallback);
-          setUser((current) => firebaseAuth.currentUser ?? current);
           setAuthReady(true);
         });
-    }
     return () => {
       active = false;
+      controller.abort();
       window.clearTimeout(fallback);
-      unsubscribe();
     };
   }, []);
 
-  async function handleSignIn() {
+  const handleSignIn = useCallback(async (credential: string) => {
     if (signingIn) return;
     setAuthError('');
     setSigningIn(true);
-    let redirectAttempted = false;
     try {
-      if (prefersRedirectSignIn()) {
-        redirectAttempted = true;
-        if (!markPendingAuthRedirect()) {
-          setAuthError('Safari blocked the storage needed for sign-in. Reduce protections for this site, then try again.');
-          return;
-        }
-        await signInWithRedirect(firebaseAuth, googleProvider);
-        return;
-      }
-      const result = await signInWithPopup(firebaseAuth, googleProvider);
-      setUser(result.user);
+      const response = await fetch('/api/auth/session', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential }),
+      });
+      const payload = await response.json().catch(() => null) as { user?: AppUser; error?: string } | null;
+      if (!response.ok || !payload?.user) throw new Error(payload?.error || 'Google sign-in could not be completed.');
+      setUser(payload.user);
       setAuthReady(true);
     } catch (cause) {
-      if (redirectAttempted) {
-        clearPendingAuthRedirect();
-        setAuthError(authErrorMessage(cause));
-        return;
-      }
-      const code = authErrorCode(cause);
-      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
-        if (!markPendingAuthRedirect()) {
-          setAuthError('Safari blocked the storage needed for sign-in. Allow pop-ups or reduce protections for this site, then try again.');
-          return;
-        }
-        try {
-          await signInWithRedirect(firebaseAuth, googleProvider);
-          return;
-        } catch (redirectCause) {
-          clearPendingAuthRedirect();
-          setAuthError(authErrorMessage(redirectCause));
-        }
-      } else {
-        setAuthError(authErrorMessage(cause));
-      }
+      setAuthError(cause instanceof Error ? cause.message : 'Google sign-in could not be completed. Please try again.');
     } finally {
       setSigningIn(false);
     }
-  }
+  }, [signingIn]);
+
+  const handleSignOut = useCallback(async () => {
+    disableGoogleAutoSelect();
+    await fetch('/api/auth/session', { method: 'DELETE', credentials: 'same-origin' }).catch(() => undefined);
+    setUser(null);
+    setAuthError('');
+  }, []);
 
   if (!authReady) return <AuthLoading />;
-  if (!user) return <LandingPage signIn={handleSignIn} error={authError} signingIn={signingIn} />;
-  return <WorkoutApp user={user} signOutUser={() => signOut(firebaseAuth)} />;
+  if (!user) return <LandingPage signIn={handleSignIn} setError={setAuthError} error={authError} signingIn={signingIn} />;
+  return <WorkoutApp user={user} signOutUser={handleSignOut} />;
 }
 
 function AuthLoading() {
   return <main className="auth-loading"><span className="brand-mark"><Dumbbell size={18} /></span><p>Loading Workout…</p></main>;
 }
 
-function LandingPage({ signIn, error, signingIn }: { signIn: () => void; error: string; signingIn: boolean }) {
+function LandingPage({ signIn, setError, error, signingIn }: {
+  signIn: (credential: string) => void;
+  setError: (message: string) => void;
+  error: string;
+  signingIn: boolean;
+}) {
+  function focusGoogleButton() {
+    document.getElementById('google-sign-in')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   return (
     <main className="landing-shell">
       <nav className="landing-nav" aria-label="Landing navigation">
         <div className="brand"><span className="brand-mark"><Dumbbell size={16} strokeWidth={2.4} /></span><span>WORKOUT</span></div>
-        <button className="landing-sign-in" onClick={signIn} disabled={signingIn} aria-busy={signingIn}><LogIn size={17} /> {signingIn ? 'Signing in…' : 'Sign in'}</button>
+        <button className="landing-sign-in" onClick={focusGoogleButton} disabled={signingIn} aria-busy={signingIn}><LogIn size={17} /> {signingIn ? 'Signing in…' : 'Sign in'}</button>
       </nav>
       <section className="landing-hero">
         <div className="landing-copy">
           <span className="eyebrow">TRAIN WITH INTENTION</span>
           <h1>Progress you<br />can prove.</h1>
           <p>A focused space for strength, cardio, meals and the small wins that become lasting progress.</p>
-          <button className="google-button" onClick={signIn} disabled={signingIn} aria-busy={signingIn}><span aria-hidden="true">G</span> {signingIn ? 'Opening Google…' : 'Continue with Google'} <ArrowRight size={18} /></button>
+          <GoogleSignInButton onCredential={signIn} onError={setError} signingIn={signingIn} />
           {error && <p className="auth-error" role="alert">{error}</p>}
           <small>Private by account. Your training history stays yours.</small>
         </div>
@@ -274,7 +174,7 @@ function LandingPage({ signIn, error, signingIn }: { signIn: () => void; error: 
   );
 }
 
-function WorkoutApp({ user, signOutUser }: { user: User; signOutUser: () => void }) {
+function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => void }) {
   const today = new Date();
   const todayKey = localDateKey(today);
   const todayDay = mondayIndex(today);
@@ -340,7 +240,7 @@ function WorkoutApp({ user, signOutUser }: { user: User; signOutUser: () => void
       setSyncState('loading');
       setLoadError('');
       try {
-        const response = await authenticatedFetch(user, '/api/data', { cache: 'no-store' });
+        const response = await authenticatedFetch('/api/data', { cache: 'no-store' });
         if (!response.ok) throw new Error((await response.json().catch(() => null))?.error ?? 'Data could not be loaded.');
         const payload = await response.json() as { data: WorkoutData; revision: number; migrated: boolean; isAdmin: boolean; historyPage?: { nextBefore?: string | null; hasMore?: boolean } | null };
         if (cancelled) return;
@@ -424,7 +324,7 @@ function WorkoutApp({ user, signOutUser }: { user: User; signOutUser: () => void
       let outgoingRevision = revision;
       let outgoingScopes = clientScopes;
 
-      const save = () => authenticatedFetch(user, '/api/data', {
+      const save = () => authenticatedFetch('/api/data', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -469,7 +369,7 @@ function WorkoutApp({ user, signOutUser }: { user: User; signOutUser: () => void
     }).catch(() => {
       if (latestDirtyRevision.current > savedDirtyRevision.current) setSyncState('error');
     });
-  }, [persistRecovery, recoveryKey, setData, setSyncState, setToast, user]);
+  }, [persistRecovery, recoveryKey, setData, setSyncState, setToast]);
 
   useEffect(() => {
     if (!dataReady || !dirtyRevision || dirtyRevision === scheduledRevision.current) return;
@@ -732,7 +632,7 @@ function WorkoutApp({ user, signOutUser }: { user: User; signOutUser: () => void
     }
     setHistoryLoading(true);
     try {
-      const response = await authenticatedFetch(user, `/api/data/history?before=${encodeURIComponent(historyPage.nextBefore)}`, { cache: 'no-store' });
+      const response = await authenticatedFetch(`/api/data/history?before=${encodeURIComponent(historyPage.nextBefore)}`, { cache: 'no-store' });
       const payload = await response.json().catch(() => null) as {
         workouts?: WorkoutSession[]; exerciseHistory?: WorkoutData['exerciseHistory']; nextBefore?: string | null; hasMore?: boolean; error?: string;
       } | null;
@@ -819,7 +719,7 @@ function WorkoutApp({ user, signOutUser }: { user: User; signOutUser: () => void
     try {
       const body = new FormData();
       body.set('image', file);
-      const response = await authenticatedFetch(user, '/api/nutrition/detect', { method: 'POST', body });
+      const response = await authenticatedFetch('/api/nutrition/detect', { method: 'POST', body });
       const payload = await response.json().catch(() => null) as (NutritionDraft & { error?: string; warning?: string }) | null;
       if (!response.ok || !payload) throw new Error(payload?.error || 'The nutrition label could not be read.');
       setMealDraft({ name: payload.name || 'Scanned food', kcal: payload.kcal, protein: payload.protein, carbs: payload.carbs, fats: payload.fats, sugar: payload.sugar });
@@ -879,7 +779,7 @@ function WorkoutApp({ user, signOutUser }: { user: User; signOutUser: () => void
       }
       scheduledRevision.current = latestDirtyRevision.current;
       await saveQueue.current.catch(() => undefined);
-      const response = await authenticatedFetch(user, '/api/data', {
+      const response = await authenticatedFetch('/api/data', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ baseRevision: serverRevision.current }),
       });

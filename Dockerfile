@@ -7,9 +7,9 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
-ARG NEXT_PUBLIC_FIREBASE_API_KEY
-RUN test -n "$NEXT_PUBLIC_FIREBASE_API_KEY" \
-  && NEXT_PUBLIC_FIREBASE_API_KEY="$NEXT_PUBLIC_FIREBASE_API_KEY" npm run check
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+RUN test -n "$NEXT_PUBLIC_GOOGLE_CLIENT_ID" \
+  && NEXT_PUBLIC_GOOGLE_CLIENT_ID="$NEXT_PUBLIC_GOOGLE_CLIENT_ID" npm run check
 
 FROM node:22-alpine AS runner
 WORKDIR /app

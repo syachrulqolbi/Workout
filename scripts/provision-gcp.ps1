@@ -30,6 +30,7 @@ function Assert-GcloudSuccess([string]$Action) {
   iamcredentials.googleapis.com `
   identitytoolkit.googleapis.com `
   run.googleapis.com `
+  secretmanager.googleapis.com `
   vision.googleapis.com `
   --project=$ProjectId
 Assert-GcloudSuccess 'enabling required APIs'
@@ -86,6 +87,26 @@ Assert-GcloudSuccess 'granting Firestore access to the runtime service account'
   --condition=None `
   --quiet
 Assert-GcloudSuccess 'granting Vision API quota access to the runtime service account'
+
+$sessionSecretName = 'workout-session-secret'
+& $gcloudCommand secrets describe $sessionSecretName --project=$ProjectId *> $null
+if ($LASTEXITCODE -ne 0) {
+  $secretBytes = [byte[]]::new(48)
+  [System.Security.Cryptography.RandomNumberGenerator]::Fill($secretBytes)
+  $sessionSecret = [Convert]::ToBase64String($secretBytes)
+  $sessionSecret | & $gcloudCommand secrets create $sessionSecretName `
+    --data-file=- `
+    --replication-policy=automatic `
+    --project=$ProjectId
+  Assert-GcloudSuccess 'creating the Workout session secret'
+}
+
+& $gcloudCommand secrets add-iam-policy-binding $sessionSecretName `
+  --member="serviceAccount:$runtimeEmail" `
+  --role='roles/secretmanager.secretAccessor' `
+  --project=$ProjectId `
+  --quiet
+Assert-GcloudSuccess 'allowing the runtime to read the Workout session secret'
 
 $cleanupEmail = "$CleanupServiceAccount@$ProjectId.iam.gserviceaccount.com"
 & $gcloudCommand iam service-accounts describe $cleanupEmail --project=$ProjectId *> $null
