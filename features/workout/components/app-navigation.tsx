@@ -38,5 +38,5 @@ export function Sidebar({ view, navigate, syncState, retrySave, user, signOutUse
 }
 
 export function MobileNav({ view, navigate }: NavigationProps) {
-  return <nav className="mobile-nav" aria-label="Mobile navigation">{navigation.map((item) => { const Icon = item.icon; return <button key={item.id} aria-current={view === item.id ? 'page' : undefined} className={view === item.id ? 'active' : ''} onClick={() => navigate(item.id)}><Icon size={18} /><span>{item.shortLabel ?? item.label}</span></button>; })}</nav>;
+  return <nav className="mobile-nav" aria-label="Mobile navigation">{navigation.map((item) => { const Icon = item.icon; return <button key={item.id} aria-label={item.label} aria-current={view === item.id ? 'page' : undefined} className={view === item.id ? 'active' : ''} onClick={() => navigate(item.id)}><Icon size={20} /><span>{item.shortLabel ?? item.label}</span></button>; })}</nav>;
 }
