@@ -46,3 +46,93 @@ test('authenticated mobile shell respects safe spacing and keeps navigation clea
   await levelScale.getByRole('button', { name: /Show level 8/ }).click();
   await expect(levelPanel.getByText('VIEWING LEVEL 8 OF 10')).toBeVisible();
 });
+
+test('history correction sheet keeps exercise values compact and uses the product theme', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile-chrome', 'Mobile correction-sheet check');
+
+  const data = createDefaultWorkoutData();
+  data.workouts = [{
+    id: 'session-1',
+    date: '2026-10-23T08:30:00.000Z',
+    planDay: 0,
+    name: 'Push / Pull',
+    focus: 'Chest, back and shoulders',
+    duration: 72,
+    exercises: 2,
+    sets: 5,
+    volume: 1250,
+    cardioMinutes: 0,
+    distanceKm: 0,
+    calories: 0,
+  }];
+  data.exerciseHistory = [
+    {
+      id: 'record-1',
+      sessionId: 'session-1',
+      exerciseId: 'exercise-chest-fly-machine',
+      exercise: 'Chest fly machine',
+      date: '2026-10-23T08:30:00.000Z',
+      type: 'strength',
+      measurement: 'reps',
+      loadMode: 'total',
+      weight: 12.5,
+      reps: 6,
+      setsCompleted: 3,
+      targetMet: true,
+      durationSeconds: 0,
+      durationMinutes: 0,
+      distanceKm: 0,
+      calories: 0,
+      completedSets: [],
+      estimated: false,
+    },
+    {
+      id: 'record-2',
+      sessionId: 'session-1',
+      exerciseId: 'exercise-face-pull',
+      exercise: 'Face pull',
+      date: '2026-10-23T08:30:00.000Z',
+      type: 'strength',
+      measurement: 'reps',
+      loadMode: 'total',
+      weight: 10,
+      reps: 15,
+      setsCompleted: 2,
+      targetMet: true,
+      durationSeconds: 0,
+      durationMinutes: 0,
+      distanceKm: 0,
+      calories: 0,
+      completedSets: [],
+      estimated: false,
+    },
+  ];
+
+  await page.route('**/api/auth/session', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ user: { email: 'admin@example.com', displayName: 'Syachrul' } }),
+  }));
+  await page.route('**/api/data', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ data, revision: 1, migrated: false, isAdmin: true }),
+  }));
+
+  await page.goto('/');
+  await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: 'History' }).click();
+  await expect(page.getByRole('heading', { name: 'Workout history' })).toBeVisible();
+  await page.getByRole('button', { name: /Edit Push \/ Pull/ }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Edit workout history' });
+  const firstRecord = dialog.locator('.history-record-card').first();
+  const saveButton = dialog.getByRole('button', { name: 'Save corrections' });
+  await expect(dialog).toBeVisible();
+  await expect(firstRecord).toBeVisible();
+  await expect(saveButton).toHaveCSS('background-color', 'rgb(51, 51, 51)');
+  await expect(saveButton).toHaveCSS('color', 'rgb(255, 255, 255)');
+
+  const weightBox = await firstRecord.getByLabel('KG').boundingBox();
+  const repsBox = await firstRecord.getByLabel('REPS').boundingBox();
+  expect(Math.abs((weightBox?.y ?? 0) - (repsBox?.y ?? 0))).toBeLessThanOrEqual(1);
+  expect(weightBox?.width).toBeGreaterThan(100);
+  expect(repsBox?.width).toBeGreaterThan(100);
+});

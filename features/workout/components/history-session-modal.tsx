@@ -56,5 +56,118 @@ export function HistorySessionModal({ workout, records, close, save }: {
     }, nextRecords);
   }
 
-  return <div className="modal-backdrop compact"><section ref={dialogRef} tabIndex={-1} className="meal-modal history-session-modal" role="dialog" aria-modal="true" aria-labelledby="history-session-title"><header className="modal-header"><div><span className="muted-label">CORRECT SESSION</span><h2 id="history-session-title">Edit workout history</h2><p>Adjust the session and recorded exercise values.</p></div><button className="modal-close" onClick={close} aria-label="Close history editor"><X size={20} /></button></header><form className="meal-form history-session-form" onSubmit={submit}><label className="full"><span>WORKOUT NAME</span><input name="name" defaultValue={workout.name} required /></label><label className="full"><span>FOCUS</span><input name="focus" defaultValue={workout.focus} /></label><label><span>DATE & TIME</span><input type="datetime-local" name="date" defaultValue={localDateTimeValue(workout.date)} required /></label><label><span>DURATION (MIN)</span><input type="number" name="duration" min="1" step="1" defaultValue={workout.duration} required /></label><div className="history-record-editor full"><span className="muted-label">EXERCISE RECORDS</span>{records.map((record) => <fieldset key={record.id}><legend>{record.exercise}</legend>{record.type === 'strength' && record.measurement === 'reps' && <><label><span>KG</span><input type="number" min="0" step="0.5" name={`record-${record.id}-weight`} defaultValue={record.weight} /></label><label><span>REPS</span><input type="number" min="0" step="1" name={`record-${record.id}-reps`} defaultValue={record.reps} /></label></>}{record.type === 'strength' && record.measurement === 'duration' && <label><span>TOTAL SECONDS</span><input type="number" min="0" step="1" name={`record-${record.id}-seconds`} defaultValue={record.durationSeconds} /></label>}{record.type === 'cardio' && <><label><span>MINUTES</span><input type="number" min="0" step="1" name={`record-${record.id}-minutes`} defaultValue={record.durationMinutes} /></label><label><span>DISTANCE (KM)</span><input type="number" min="0" step="0.1" name={`record-${record.id}-distance`} defaultValue={record.distanceKm} /></label><label><span>CALORIES</span><input type="number" min="0" step="1" name={`record-${record.id}-calories`} defaultValue={record.calories} /></label></>}</fieldset>)}</div><button className="primary-submit full" type="submit"><Save size={16} /> Save corrections</button></form></section></div>;
+  return (
+    <div className="modal-backdrop compact">
+      <section
+        ref={dialogRef}
+        tabIndex={-1}
+        className="meal-modal history-session-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="history-session-title"
+      >
+        <header className="modal-header history-session-header">
+          <div>
+            <span className="muted-label">CORRECT SESSION</span>
+            <h2 id="history-session-title">Edit workout history</h2>
+            <p>Adjust the session details and recorded exercise values.</p>
+          </div>
+          <button type="button" className="modal-close" onClick={close} aria-label="Close history editor">
+            <X size={20} />
+          </button>
+        </header>
+
+        <form className="meal-form history-session-form" onSubmit={submit}>
+          <section className="history-session-details full" aria-labelledby="session-details-heading">
+            <div className="history-form-section-heading">
+              <div>
+                <span className="muted-label" id="session-details-heading">SESSION DETAILS</span>
+                <p>Keep the title, timing and focus accurate.</p>
+              </div>
+            </div>
+            <div className="history-session-detail-fields">
+              <label className="full">
+                <span>WORKOUT NAME</span>
+                <input name="name" defaultValue={workout.name} required />
+              </label>
+              <label className="full">
+                <span>FOCUS</span>
+                <input name="focus" defaultValue={workout.focus} />
+              </label>
+              <label className="history-session-date">
+                <span>DATE &amp; TIME</span>
+                <input type="datetime-local" name="date" defaultValue={localDateTimeValue(workout.date)} required />
+              </label>
+              <label className="history-session-duration">
+                <span>DURATION (MIN)</span>
+                <input type="number" name="duration" min="1" step="1" defaultValue={workout.duration} required />
+              </label>
+            </div>
+          </section>
+
+          <section className="history-record-editor full" aria-labelledby="exercise-records-heading">
+            <div className="history-form-section-heading">
+              <div>
+                <span className="muted-label" id="exercise-records-heading">EXERCISE RECORDS</span>
+                <p>Values reflect the complete recorded exercise.</p>
+              </div>
+              <strong>{records.length} {records.length === 1 ? 'exercise' : 'exercises'}</strong>
+            </div>
+
+            {records.map((record, index) => (
+              <fieldset className="history-record-card" key={record.id}>
+                <legend>
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  {record.exercise}
+                </legend>
+                <div className={`history-record-fields ${record.type === 'cardio' ? 'cardio' : ''}`}>
+                  {record.type === 'strength' && record.measurement === 'reps' && (
+                    <>
+                      <label>
+                        <span>KG</span>
+                        <input type="number" min="0" step="0.5" name={`record-${record.id}-weight`} defaultValue={record.weight} />
+                      </label>
+                      <label>
+                        <span>REPS</span>
+                        <input type="number" min="0" step="1" name={`record-${record.id}-reps`} defaultValue={record.reps} />
+                      </label>
+                    </>
+                  )}
+                  {record.type === 'strength' && record.measurement === 'duration' && (
+                    <label>
+                      <span>TOTAL SECONDS</span>
+                      <input type="number" min="0" step="1" name={`record-${record.id}-seconds`} defaultValue={record.durationSeconds} />
+                    </label>
+                  )}
+                  {record.type === 'cardio' && (
+                    <>
+                      <label>
+                        <span>MINUTES</span>
+                        <input type="number" min="0" step="1" name={`record-${record.id}-minutes`} defaultValue={record.durationMinutes} />
+                      </label>
+                      <label>
+                        <span>DISTANCE (KM)</span>
+                        <input type="number" min="0" step="0.1" name={`record-${record.id}-distance`} defaultValue={record.distanceKm} />
+                      </label>
+                      <label>
+                        <span>CALORIES</span>
+                        <input type="number" min="0" step="1" name={`record-${record.id}-calories`} defaultValue={record.calories} />
+                      </label>
+                    </>
+                  )}
+                </div>
+              </fieldset>
+            ))}
+          </section>
+
+          <div className="history-session-actions full">
+            <button className="history-session-save" type="submit">
+              <Save size={18} />
+              Save corrections
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
 }
