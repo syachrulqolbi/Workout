@@ -455,7 +455,10 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
     }
     const retake = completedToday;
     if (retake && !window.confirm('Retake today’s workout? When you complete it, today’s previous workout and exercise history will be replaced.')) return;
-    updateData((current) => ({ ...current, activeWorkout: buildWorkout(todayPlan, retake, current.exerciseHistory) }));
+    updateData((current) => ({
+      ...current,
+      activeWorkout: buildWorkout(todayPlan, retake, current.exerciseHistory, { resetAt: current.levelResetAt }),
+    }));
     setWorkoutOpen(true);
   }
 
@@ -823,7 +826,7 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
         {view === 'settings' && <SettingsView user={user} reset={resetMyData} signOutUser={signOutUser} isAdmin={isAdmin} clearLocalHistory={() => setData((current) => ({ ...current, workouts: [], exerciseHistory: [], activeWorkout: null }))} />}
       </section>
       <MobileNav view={view} navigate={navigate} />
-      {workoutOpen && active && <WorkoutModal workout={active} exerciseHistory={data.exerciseHistory} finishedSets={finishedSets} totalSets={allSets.length} totalVolume={totalVolume} cardioMinutes={cardioMinutes} updateSet={updateSet} addSet={addSet} deleteSet={deleteSet} updateRestTimer={updateRestTimer} close={() => setWorkoutOpen(false)} discard={discardWorkout} complete={completeWorkout} />}
+      {workoutOpen && active && <WorkoutModal workout={active} exerciseHistory={data.exerciseHistory} levelExercises={data.dayPlans.find((plan) => plan.day === active.planDay)?.exercises ?? []} levelResetAt={data.levelResetAt} finishedSets={finishedSets} totalSets={allSets.length} totalVolume={totalVolume} cardioMinutes={cardioMinutes} updateSet={updateSet} addSet={addSet} deleteSet={deleteSet} updateRestTimer={updateRestTimer} close={() => setWorkoutOpen(false)} discard={discardWorkout} complete={completeWorkout} />}
       {mealOpen && <MealModal date={selectedMealDate} draft={mealDraft} meal={editingMeal} scope={mealScope} close={() => { setMealOpen(false); setMealDraft(null); setEditingMeal(null); }} submit={saveMeal} />}
       {libraryOpen && <ExerciseLibraryModal plans={data.dayPlans} selectedDay={selectedPlanDay} setSelectedDay={setSelectedPlanDay} todayDay={todayDay} close={() => setLibraryOpen(false)} updatePlan={updatePlan} add={addExercise} update={updateExercise} remove={removeExercise} />}
       {editingWorkout && <HistorySessionModal workout={editingWorkout} records={data.exerciseHistory.filter((record) => record.sessionId === editingWorkout.id)} close={() => setEditingWorkout(null)} save={saveWorkoutCorrection} />}

@@ -5,15 +5,20 @@ import { stableExerciseId, type ActiveWorkout, type DayPlan, type WorkoutData } 
 type BuildWorkoutOptions = {
   now?: Date;
   createId?: () => string;
+  resetAt?: string;
 };
 
 export function buildWorkout(
   plan: DayPlan,
   retake: boolean,
   history: WorkoutData['exerciseHistory'],
-  { now = new Date(), createId = () => crypto.randomUUID() }: BuildWorkoutOptions = {},
+  { now = new Date(), createId = () => crypto.randomUUID(), resetAt = '' }: BuildWorkoutOptions = {},
 ): ActiveWorkout {
-  const latestByExercise = indexLatestExerciseRecords(history);
+  const resetTime = resetAt ? new Date(resetAt).getTime() : 0;
+  const currentHistory = Number.isFinite(resetTime) && resetTime > 0
+    ? history.filter((record) => record.type !== 'strength' || !(new Date(record.date).getTime() < resetTime))
+    : history;
+  const latestByExercise = indexLatestExerciseRecords(currentHistory);
 
   return {
     date: localDateKey(now), planDay: plan.day, startedAt: now.toISOString(), name: plan.name, focus: plan.focus, retake, restTimer: null,

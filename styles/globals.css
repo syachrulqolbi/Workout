@@ -196,14 +196,22 @@ strong, b { color: var(--title-color); }
 .level-metrics strong { display: block; margin-top: 6px; font-size: .813rem; font-weight: 600; line-height: 1.35; }
 .level-current-note { width: max-content; max-width: 100%; margin-top: 10px; padding: 6px 9px; background: var(--soft); color: var(--muted); border-radius: 99px; font-size: .75rem; letter-spacing: .04em; }
 .level-current-note strong { color: var(--ink); font-weight: 600; }
-.level-scale { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; margin-top: 22px; }
-.level-scale button { min-width: 0; height: 32px; padding: 0; display: grid; place-items: center; border: 1px solid transparent; background: #ededed; color: #888; border-radius: 6px; font: inherit; font-size: .75rem; cursor: pointer; transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; -webkit-tap-highlight-color: transparent; }
+.level-scale-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 22px; }
+.level-scale-heading span { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: .08em; }
+.level-scale-heading small { color: var(--muted); font-size: .688rem; }
+.level-scale { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.level-scale button { position: relative; min-width: 0; height: 38px; padding: 0 0 3px; display: grid; place-items: center; border: 1px solid var(--line); background: #f1f1f1; color: #888; border-radius: 10px; font: inherit; font-size: .75rem; font-weight: 600; cursor: pointer; transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease, color .18s ease; -webkit-tap-highlight-color: transparent; }
 .level-scale button.reached { background: var(--tier-color); color: #fff; }
 .level-scale button:first-child.reached, .level-scale button:nth-child(2).reached, .level-scale button:nth-child(3).reached { color: #444; }
-.level-scale button.achieved { box-shadow: inset 0 0 0 1px rgba(17, 17, 17, .24); }
-.level-scale button.selected { border-color: var(--ink); box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ink); transform: translateY(-1px); }
+.level-scale button.achieved { box-shadow: inset 0 0 0 1px rgba(17,17,17,.28); }
+.level-scale button.achieved i { position: absolute; left: 50%; bottom: 5px; width: 4px; height: 4px; background: currentColor; border-radius: 50%; transform: translateX(-50%); }
+.level-scale button.selected { border-color: var(--ink); box-shadow: inset 0 0 0 2px #fff, 0 0 0 2px var(--ink); }
 .level-scale button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-.level-scale-labels { display: flex; justify-content: space-between; margin-top: 7px; color: var(--muted); font-size: .75rem; }
+.level-scale-labels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; color: var(--muted); font-size: .688rem; }
+.level-scale-labels span { display: flex; gap: 4px; }
+.level-scale-labels span:nth-child(2) { justify-content: center; }
+.level-scale-labels span:last-child { justify-content: flex-end; }
+.level-scale-labels b { color: var(--ink); font-weight: 600; }
 .strength-level-detail > p { margin: 17px 0 0; color: var(--muted); font-size: .75rem; line-height: 1.65; }
 .cardio-detail .level-title > span { background: var(--ink); }
 .plan-summary-detail .level-title > span { background: var(--ink); }
@@ -280,8 +288,9 @@ strong, b { color: var(--title-color); }
   .body-figure svg { height: 220px; }
   .level-metrics { grid-template-columns: 1fr; }
   .summary-level-metrics { grid-template-columns: 1fr 1fr; }
-  .level-scale { gap: 3px; }
-  .level-scale button { height: 29px; }
+  .level-scale-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .level-scale { grid-template-columns: repeat(5, minmax(44px, 1fr)); gap: 8px; }
+  .level-scale button { height: 44px; }
 }
 
 /* Product views and interactions */

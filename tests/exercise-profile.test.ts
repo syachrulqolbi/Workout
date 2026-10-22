@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { strengthLevelForActiveExercise, strengthLevelForExercise } from '../lib/exercise-profile';
+import { strengthLevelForActiveExercise, strengthLevelForExercise, strengthLevelForWorkoutExercise } from '../lib/exercise-profile';
 import type { ExerciseEntry, LibraryExercise } from '../lib/workout-data';
 
 function exercise(overrides: Partial<LibraryExercise> = {}): LibraryExercise {
@@ -45,5 +45,29 @@ describe('strength levels', () => {
     }]);
     expect(level?.index).toBe(10);
     expect(level?.ranges[9].min).toBe(91.5);
+  });
+
+  it('uses the current plan standard and reset boundary inside an active workout', () => {
+    const plan = exercise({
+      id: 'exercise-bench', name: 'Bench', loadMode: 'total', weight: 34,
+      levelStandard: { thresholds: [34, 45, 56, 71, 86, 103.5, 121, 134.5, 147.5, 161], metric: 'weight', unit: 'kg' },
+    });
+    const active: ExerciseEntry = {
+      id: plan.id, name: plan.name, type: 'strength', measurement: 'reps', loadMode: 'total',
+      targetWeight: 90, targetReps: 8, targetDurationSeconds: 0, targetDurationMinutes: 0,
+      targetDistanceKm: 0, restSeconds: 90, levelStandard: undefined,
+      sets: [{ id: 'set-1', weight: 90, reps: 8, durationSeconds: 0, durationMinutes: 0, distanceKm: 0, calories: 0, done: false }],
+    };
+    const oldHistory = [{
+      id: 'record-1', sessionId: 'session-1', exerciseId: plan.id, exercise: plan.name,
+      date: '2026-09-01T00:00:00.000Z', type: 'strength' as const, measurement: 'reps' as const,
+      loadMode: 'total' as const, weight: 121, reps: 8, setsCompleted: 1, targetMet: true,
+      durationSeconds: 0, durationMinutes: 0, distanceKm: 0, calories: 0, completedSets: [], estimated: false,
+    }];
+
+    const resetAt = '2026-10-01T00:00:00.000Z';
+    expect(strengthLevelForWorkoutExercise(active, [plan], oldHistory, resetAt)?.index)
+      .toBe(strengthLevelForExercise(plan, oldHistory, resetAt)?.index);
+    expect(strengthLevelForWorkoutExercise(active, [plan], oldHistory, resetAt)?.index).toBe(1);
   });
 });

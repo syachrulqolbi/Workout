@@ -2,8 +2,8 @@
 
 import { Check, ChevronLeft, ChevronRight, Clock3, Plus, Timer, TrendingUp, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { strengthLevelForActiveExercise } from '@/lib/exercise-profile';
-import { type ActiveRestTimer, type ActiveWorkout, type ExerciseEntry, type ExerciseRecord, type SetEntry } from '@/lib/workout-data';
+import { strengthLevelForWorkoutExercise } from '@/lib/exercise-profile';
+import { type ActiveRestTimer, type ActiveWorkout, type ExerciseEntry, type ExerciseRecord, type LibraryExercise, type SetEntry } from '@/lib/workout-data';
 import { indexLatestExerciseRecords, latestExerciseRecord } from '@/lib/workout-identity';
 import { formatTimer } from '@/lib/workout-ui';
 import { useDialogAccessibility } from '@/features/workout/hooks/use-dialog-accessibility';
@@ -11,6 +11,8 @@ import { useDialogAccessibility } from '@/features/workout/hooks/use-dialog-acce
 type WorkoutModalProps = {
   workout: ActiveWorkout;
   exerciseHistory: ExerciseRecord[];
+  levelExercises: LibraryExercise[];
+  levelResetAt: string;
   finishedSets: number;
   totalSets: number;
   totalVolume: number;
@@ -25,7 +27,7 @@ type WorkoutModalProps = {
 };
 
 export function WorkoutModal({
-  workout, exerciseHistory, finishedSets, totalSets, totalVolume, cardioMinutes,
+  workout, exerciseHistory, levelExercises, levelResetAt, finishedSets, totalSets, totalVolume, cardioMinutes,
   updateSet, addSet, deleteSet, updateRestTimer, close, discard, complete,
 }: WorkoutModalProps) {
   const restTimer = workout.restTimer;
@@ -43,7 +45,9 @@ export function WorkoutModal({
   const activeExercise = workout.exercises[Math.min(activeIndex, Math.max(0, workout.exercises.length - 1))];
   const previousExercise = activeIndex > 0 ? workout.exercises[activeIndex - 1] : null;
   const nextExercise = activeIndex < workout.exercises.length - 1 ? workout.exercises[activeIndex + 1] : null;
-  const activeLevel = activeExercise ? strengthLevelForActiveExercise(activeExercise, exerciseHistory) : null;
+  const activeLevel = activeExercise
+    ? strengthLevelForWorkoutExercise(activeExercise, levelExercises, exerciseHistory, levelResetAt)
+    : null;
   const elapsed = Math.max(0, Math.floor((elapsedNow - new Date(workout.startedAt).getTime()) / 1000));
 
   useEffect(() => {

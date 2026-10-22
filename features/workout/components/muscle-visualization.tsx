@@ -104,7 +104,7 @@ export function MuscleVisualization({ plans, history, resetAt }: { plans: DayPla
             </div>
 
             <div className="muscle-detail-panel">
-              {!selected ? <PlanSummaryDetail exercises={exercises} muscles={summary.muscles} averageLevel={summary.averageLevel} gradedExerciseCount={summary.gradedExerciseCount} /> : level ? <StrengthLevelDetail key={selected.id} level={level} /> : selected.type === 'cardio' ? <CardioDetail exercise={selected} /> : <UngradedStrengthDetail exercise={selected} />}
+              {!selected ? <PlanSummaryDetail exercises={exercises} muscles={summary.muscles} averageLevel={summary.averageLevel} gradedExerciseCount={summary.gradedExerciseCount} /> : level ? <StrengthLevelDetail key={`${selectedEntry.key}:${level.index}`} level={level} /> : selected.type === 'cardio' ? <CardioDetail exercise={selected} /> : <UngradedStrengthDetail exercise={selected} />}
               <div className="trained-groups">
                 <span className="muted-label">{selected ? 'TRAINED MUSCLES' : 'PLAN COVERAGE'}</span>
                 <div>{muscles.primary.map((group) => <b key={group}>{MUSCLE_LABELS[group]}</b>)}{muscles.secondary.map((group) => <span key={group}>{MUSCLE_LABELS[group]}</span>)}</div>
@@ -153,21 +153,22 @@ function StrengthLevelDetail({ level }: { level: NonNullable<ReturnType<typeof s
       : `${formatMetric(selectedRange.min)} to under ${formatMetric(selectedRange.max)}`;
   return (
     <div className="strength-level-detail">
-      <span className="level-kicker">VIEWING LEVEL {selectedIndex} OF 10</span>
+      <span className="level-kicker">{selectedIndex === level.index ? 'CURRENT' : 'VIEWING'} LEVEL {selectedIndex} OF 10</span>
       <div className="level-title"><h4>{selectedTier.name}</h4><span style={{ background: selectedTier.color }}>{selectedIndex}</span></div>
       <div className="level-metrics">
         <div><span>{level.hasHistory ? 'BEST LOGGED' : 'PLAN LOAD'}</span><strong>{load}</strong></div>
         <div><span>LEVEL {selectedIndex} RANGE</span><strong>{range}</strong></div>
       </div>
       {selectedIndex !== level.index && <div className="level-current-note">CURRENT LEVEL · <strong>L{level.index} {level.name}</strong></div>}
+      <div className="level-scale-heading"><span>EXPLORE LEVELS</span><small>Tap a level to view its range</small></div>
       <div className="level-scale" aria-label={`Current level ${level.index} of 10, ${level.name}. Choose a level to show its range.`}>
         {STRENGTH_LEVELS.map((tier, index) => {
           const tierIndex = index + 1;
           const classes = [tierIndex <= level.index ? 'reached' : '', tierIndex === level.index ? 'achieved' : '', tierIndex === selectedIndex ? 'selected' : ''].filter(Boolean).join(' ');
-          return <button key={tier.name} type="button" className={classes} style={{ '--tier-color': tier.color } as CSSProperties} aria-label={`Show level ${tierIndex}, ${tier.name}, range`} aria-pressed={tierIndex === selectedIndex} onClick={() => setSelectedIndex(tierIndex)}><span>{tierIndex}</span></button>;
+          return <button key={tier.name} type="button" className={classes} style={{ '--tier-color': tier.color } as CSSProperties} aria-label={`Show level ${tierIndex}, ${tier.name}, range${tierIndex === level.index ? ', current level' : ''}`} aria-pressed={tierIndex === selectedIndex} onClick={() => setSelectedIndex(tierIndex)}><span>{tierIndex}</span>{tierIndex === level.index && <i aria-hidden="true" />}</button>;
         })}
       </div>
-      <div className="level-scale-labels"><span>Beginner</span><span>Intermediate+</span><span>Elite</span></div>
+      <div className="level-scale-labels"><span><b>L1</b> Beginner</span><span><b>L6</b> Intermediate+</span><span><b>L10</b> Elite</span></div>
       <p>{level.metric === 'assistanceEquivalent' ? 'Assistance is converted to an equivalent load: machine assistance is negative, while added external weight is positive.' : level.isAssistance && level.metric === 'weight' ? 'Lower machine assistance is stronger. Your lowest logged assistance sets this level.' : level.metric === 'reps' ? 'Your best completed repetitions set this level.' : level.metric === 'seconds' ? 'Your best completed hold duration sets this level.' : level.loadMode === 'perSide' ? 'This exercise is measured per side. Personal targets do not change its level bands.' : 'Your best logged load sets the level. Personal targets are tracked separately and do not change the level bands.'}</p>
     </div>
   );

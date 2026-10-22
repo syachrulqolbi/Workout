@@ -215,6 +215,19 @@ export function strengthLevelForActiveExercise(exercise: ExerciseEntry, history:
   }, history, resetAt);
 }
 
+export function strengthLevelForWorkoutExercise(
+  exercise: ExerciseEntry,
+  planExercises: LibraryExercise[],
+  history: ExerciseRecord[] = [],
+  resetAt = '',
+) {
+  const planExercise = planExercises.find((candidate) => candidate.id === exercise.id)
+    ?? planExercises.find((candidate) => exerciseNamesMatch(candidate.name, exercise.name));
+  return planExercise
+    ? strengthLevelForExercise(planExercise, history, resetAt)
+    : strengthLevelForActiveExercise(exercise, history, resetAt);
+}
+
 export function strengthLevelForExercise(exercise: LibraryExercise, history: ExerciseRecord[], resetAt = '', indexedMatches?: ExerciseRecord[]): StrengthLevel | null {
   if (exercise.type === 'cardio') return null;
   if (exercise.levelStandard === null) return null;
