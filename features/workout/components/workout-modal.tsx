@@ -140,28 +140,20 @@ export function WorkoutModal({
     <div className="modal-backdrop">
       <section ref={dialogRef} tabIndex={-1} className="workout-modal" role="dialog" aria-modal="true" aria-labelledby="workout-title">
         <header className="workout-modal-header">
-          <div>
+          <div className="workout-modal-heading">
             <span className="muted-label">{workout.retake ? 'RETAKING TODAY · REPLACES TODAY’S HISTORY' : 'WORKOUT IN PROGRESS'}</span>
-            <h2 id="workout-title">{workout.name}</h2>
-            <p>{workout.focus}</p>
+            <div className="workout-modal-title-line">
+              <h2 id="workout-title">{workout.name}</h2>
+              <div className="workout-clock"><Clock3 size={16} /><strong>{formatTimer(elapsed)}</strong></div>
+            </div>
+            <div className="workout-session-meta">
+              <span>Exercise {activeIndex + 1} of {workout.exercises.length}</span>
+              <strong>{finishedSets}/{totalSets} sets complete</strong>
+            </div>
           </div>
-          <div className="workout-clock"><Clock3 size={17} /><strong>{formatTimer(elapsed)}</strong></div>
           <button className="modal-close" onClick={() => releaseAudio(close, false)} aria-label="Close workout"><X size={20} /></button>
         </header>
 
-        <div className="workout-deck-status">
-          <label className="workout-exercise-picker">
-            <span className="sr-only">Choose current exercise</span>
-            <select aria-label="Choose current exercise" value={activeIndex} onChange={(event) => showExercise(Number(event.target.value))}>
-              {workout.exercises.map((exercise, index) => (
-                <option value={index} key={`${exercise.id}:${index}`}>
-                  {String(index + 1).padStart(2, '0')} / {workout.exercises.length} · {exercise.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <strong>{finishedSets}/{totalSets} sets complete</strong>
-        </div>
         <div className="workout-progress"><span style={{ width: `${totalSets ? finishedSets / totalSets * 100 : 0}%` }} /></div>
         {restTimer && <RestTimerPanel timer={restTimer} remaining={restRemaining} addTime={() => updateRestTimer({ ...restTimer, endsAt: restTimer.endsAt + 15000, duration: restTimer.duration + 15 })} skip={() => { updateRestTimer(null); setRestAnnouncement('Rest timer skipped.'); }} />}
         <p className="sr-only" aria-live="assertive">{restAnnouncement}</p>
@@ -172,40 +164,39 @@ export function WorkoutModal({
             swipeStart.current = null;
             return;
           }
-          event.currentTarget.setPointerCapture(event.pointerId);
           swipeStart.current = { x: event.clientX, y: event.clientY };
         }} onPointerUp={(event) => endSwipe(event.clientX, event.clientY)} onPointerCancel={() => { swipeStart.current = null; }}>
           {activeExercise ? (
-            <>
-              <div className="workout-swipe-hint"><ChevronLeft size={14} /> Swipe anywhere in this area <ChevronRight size={14} /></div>
-              <div className="workout-deck">
-                {previousExercise && <button className="workout-card-peek previous" onClick={() => showExercise(activeIndex - 1)} aria-label={`Previous exercise: ${previousExercise.name}`}><span>{previousExercise.name}</span></button>}
-                <section className={`workout-exercise workout-swipe-card ${restTimer?.exerciseId === activeExercise.id ? 'resting' : ''}`} key={activeExercise.id} tabIndex={0} onKeyDown={(event) => { if (event.key === 'ArrowLeft') showExercise(activeIndex - 1); if (event.key === 'ArrowRight') showExercise(activeIndex + 1); }}>
-                  <div className="workout-exercise-title">
-                    <span>{String(activeIndex + 1).padStart(2, '0')}</span>
-                    <div>
-                      <h3>{activeExercise.name}</h3>
-                      <div className="workout-exercise-tags"><b>{activeExercise.category || (activeExercise.type === 'cardio' ? 'CARDIO' : 'STRENGTH')}</b>{activeLevel && <b>L{activeLevel.index} · {activeLevel.name}</b>}</div>
-                      <p>{activeExercise.sets.filter((set) => set.done).length}/{activeExercise.sets.length} complete</p>
+            <div className="workout-deck">
+              {previousExercise && <button className="workout-card-peek previous" onClick={() => showExercise(activeIndex - 1)} aria-label={`Previous exercise: ${previousExercise.name}`}><span>{previousExercise.name}</span></button>}
+              <section className={`workout-exercise workout-swipe-card ${restTimer?.exerciseId === activeExercise.id ? 'resting' : ''}`} key={activeExercise.id} tabIndex={0} onKeyDown={(event) => { if (event.key === 'ArrowLeft') showExercise(activeIndex - 1); if (event.key === 'ArrowRight') showExercise(activeIndex + 1); }}>
+                <div className="workout-exercise-title">
+                  <span>{String(activeIndex + 1).padStart(2, '0')}</span>
+                  <div>
+                    <h3>{activeExercise.name}</h3>
+                    <div className="workout-exercise-tags">
+                      <b>{activeExercise.category || (activeExercise.type === 'cardio' ? 'CARDIO' : 'STRENGTH')}</b>
+                      {activeLevel && <b>L{activeLevel.index} · {activeLevel.name}</b>}
+                      <span>{activeExercise.sets.filter((set) => set.done).length}/{activeExercise.sets.length} complete</span>
                     </div>
                   </div>
+                </div>
 
-                  <ExerciseMetrics exercise={activeExercise} />
-                  <ProgressionGuidance exercise={activeExercise} previous={latestExerciseRecord(latestRecords, activeExercise)} />
+                <ExerciseMetrics exercise={activeExercise} />
+                <ProgressionGuidance exercise={activeExercise} previous={latestExerciseRecord(latestRecords, activeExercise)} />
 
-                  {activeExercise.type === 'strength' && activeExercise.measurement === 'duration' ? (
-                    <TimedStrengthSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
-                  ) : activeExercise.type === 'strength' ? (
-                    <StrengthSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
-                  ) : (
-                    <CardioSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
-                  )}
+                {activeExercise.type === 'strength' && activeExercise.measurement === 'duration' ? (
+                  <TimedStrengthSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
+                ) : activeExercise.type === 'strength' ? (
+                  <StrengthSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
+                ) : (
+                  <CardioSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
+                )}
 
-                  <button className="add-set-button" onClick={() => addSet(activeExercise.id)}><Plus size={14} /> Add {activeExercise.type === 'cardio' ? 'interval' : 'set'}</button>
-                </section>
-                {nextExercise && <button className="workout-card-peek next" onClick={() => showExercise(activeIndex + 1)} aria-label={`Next exercise: ${nextExercise.name}`}><span>{nextExercise.name}</span></button>}
-              </div>
-            </>
+                <button className="add-set-button" onClick={() => addSet(activeExercise.id)}><Plus size={14} /> Add {activeExercise.type === 'cardio' ? 'interval' : 'set'}</button>
+              </section>
+              {nextExercise && <button className="workout-card-peek next" onClick={() => showExercise(activeIndex + 1)} aria-label={`Next exercise: ${nextExercise.name}`}><span>{nextExercise.name}</span></button>}
+            </div>
           ) : <div className="workout-deck-empty">No exercises in this workout.</div>}
         </div>
 
@@ -334,7 +325,7 @@ function ProgressionGuidance({ exercise, previous }: { exercise: ExerciseEntry; 
       ? `${currentMet ? 'Target reached. Next session' : 'Previous target complete. Today'} try ${nextMinutes} min${nextDistance ? ` or ${nextDistance} km` : ''}.`
       : `Build consistency at ${exercise.targetDurationMinutes} min${exercise.targetDistanceKm ? ` and ${exercise.targetDistanceKm} km` : ''}, then add ${minuteStep} minutes.`;
 
-    return <div className={`progression-guidance ${currentMet ? 'achieved' : ''}`}><span><TrendingUp size={15} /> PROGRESSION</span><strong>{previousText}</strong><p>{advice}</p></div>;
+    return <ProgressionDetails achieved={currentMet} previousText={previousText} advice={advice} />;
   }
 
   if (exercise.measurement === 'duration') {
@@ -348,7 +339,7 @@ function ProgressionGuidance({ exercise, previous }: { exercise: ExerciseEntry; 
     const advice = ready
       ? `${currentMet ? 'Target reached. Next session' : 'Previous target complete. Today'} try ${nextSeconds} seconds per set.`
       : `Hold each set for ${exercise.targetDurationSeconds} seconds, then add ${step} seconds.`;
-    return <div className={`progression-guidance ${currentMet ? 'achieved' : ''}`}><span><TrendingUp size={15} /> PROGRESSION</span><strong>{previousText}</strong><p>{advice}</p></div>;
+    return <ProgressionDetails achieved={currentMet} previousText={previousText} advice={advice} />;
   }
 
   const inverseLoad = exercise.loadMode === 'assistance';
@@ -373,7 +364,19 @@ function ProgressionGuidance({ exercise, previous }: { exercise: ExerciseEntry; 
     advice = `Hold ${exercise.targetWeight} kg until every work set reaches ${exercise.targetReps} reps, then ${inverseLoad ? 'reduce assistance' : 'add weight'}.`;
   }
 
-  return <div className={`progression-guidance ${currentMet ? 'achieved' : ''}`}><span><TrendingUp size={15} /> PROGRESSION</span><strong>{previousText}</strong><p>{advice}</p></div>;
+  return <ProgressionDetails achieved={currentMet} previousText={previousText} advice={advice} />;
+}
+
+function ProgressionDetails({ achieved, previousText, advice }: { achieved: boolean; previousText: string; advice: string }) {
+  return (
+    <details className={`progression-guidance ${achieved ? 'achieved' : ''}`}>
+      <summary>
+        <span><TrendingUp size={15} /> PROGRESSION</span>
+        <strong>{previousText}</strong>
+      </summary>
+      <p>{advice}</p>
+    </details>
+  );
 }
 
 function playCompletionTone(context: AudioContext | null) {

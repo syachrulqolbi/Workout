@@ -138,15 +138,21 @@ test('history correction sheet keeps exercise values compact and uses the produc
   expect(repsBox?.width).toBeGreaterThan(100);
 });
 
-test('active workout uses a wide swipe deck with direct exercise navigation', async ({ page }, testInfo) => {
+test('active workout keeps the card wide, compact and vertically usable', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chrome', 'Mobile workout-deck check');
 
   const data = createDefaultWorkoutData();
   let setIndex = 0;
-  data.activeWorkout = buildWorkout(data.dayPlans[4], false, [], {
+  const activeWorkout = buildWorkout(data.dayPlans[4], false, [], {
     now: new Date('2026-10-23T08:30:00.000Z'),
     createId: () => `set-${setIndex++}`,
   });
+  const overflowSet = activeWorkout.exercises[1].sets.at(-1)!;
+  activeWorkout.exercises[1].sets.push(...Array.from({ length: 4 }, (_, index) => ({
+    ...overflowSet,
+    id: `overflow-set-${index}`,
+  })));
+  data.activeWorkout = activeWorkout;
 
   await page.route('**/api/auth/session', (route) => route.fulfill({
     contentType: 'application/json',
@@ -160,21 +166,25 @@ test('active workout uses a wide swipe deck with direct exercise navigation', as
   await page.goto('/');
   await page.getByRole('button', { name: 'Resume workout' }).click();
   const dialog = page.getByRole('dialog', { name: 'Upper volume' });
-  const picker = dialog.getByRole('combobox', { name: 'Choose current exercise' });
   const card = dialog.locator('.workout-swipe-card');
+  const scrollRegion = dialog.locator('.workout-deck-scroll');
   const next = dialog.getByRole('button', { name: 'Next exercise', exact: true });
   await expect(dialog).toBeVisible();
-  await expect(picker).toBeVisible();
+  await expect(dialog.getByRole('combobox', { name: 'Choose current exercise' })).toHaveCount(0);
   await expect(card).toBeVisible();
 
   const cardBox = await card.boundingBox();
   const nextBox = await next.boundingBox();
+  const headerBox = await dialog.locator('.workout-modal-header').boundingBox();
   expect(cardBox?.width).toBeGreaterThanOrEqual(370);
+  expect(headerBox?.height).toBeLessThanOrEqual(115);
   expect(nextBox?.width).toBeGreaterThanOrEqual(54);
   expect(nextBox?.height).toBeGreaterThanOrEqual(54);
 
-  const pickerBox = await picker.boundingBox();
-  expect(pickerBox?.width).toBeGreaterThanOrEqual(350);
-  await picker.selectOption('1');
-  await expect(card.getByRole('heading', { name: 'Lat pulldown' })).toBeVisible();
+  await expect(card.getByText('PROGRESSION')).toBeVisible();
+  await next.click();
+  await expect(card.getByRole('heading', { name: activeWorkout.exercises[1].name })).toBeVisible();
+
+  await scrollRegion.evaluate((element) => { element.scrollTop = 160; });
+  await expect.poll(() => scrollRegion.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 });
