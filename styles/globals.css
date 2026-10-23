@@ -532,8 +532,12 @@ button.nav-item.active { background: var(--soft); }
 .workout-modal-header p { margin: 0; color: var(--muted); font-size: 9px; }
 .workout-clock { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
 .workout-clock strong { font-size: 12px; }
-.workout-deck-status { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 28px; color: var(--muted); background: #fafafa; font-size: 9px; }
-.workout-deck-status strong { color: var(--ink); font-weight: 500; }
+.workout-deck-status { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 28px; color: var(--muted); background: #fafafa; font-size: 9px; }
+.workout-deck-status strong { flex: 0 0 auto; color: var(--ink); font-weight: 500; white-space: nowrap; }
+.workout-exercise-picker { position: relative; min-width: 0; width: min(390px, 68%); }
+.workout-exercise-picker::after { content: '⌄'; position: absolute; top: 50%; right: 13px; color: var(--muted); font-size: 15px; line-height: 1; pointer-events: none; transform: translateY(-58%); }
+.workout-exercise-picker select { width: 100%; height: 40px; padding: 0 34px 0 12px; appearance: none; outline: 0; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 12px; font: inherit; font-size: 10px; font-weight: 500; text-overflow: ellipsis; cursor: pointer; }
+.workout-exercise-picker select:focus { border-color: #777; box-shadow: 0 0 0 3px rgba(39,39,39,.08); }
 .workout-progress { height: 4px; background: #e8e8e8; }
 .workout-progress span { height: 100%; display: block; background: var(--ink); transition: width .25s ease; }
 .rest-timer-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 11px; padding: 12px 28px 13px; background: var(--ink); color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
@@ -549,7 +553,7 @@ button.nav-item.active { background: var(--soft); }
 .rest-timer-bar button:hover { background: #444; }
 .rest-timer-bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .workout-scroll { min-height: 0; overflow-y: auto; display: grid; gap: 12px; padding: 20px 28px; }
-.workout-deck-scroll { overflow-x: hidden; align-content: start; }
+.workout-deck-scroll { overflow-x: hidden; align-content: start; touch-action: pan-y; }
 .workout-deck { position: relative; min-width: 0; padding-inline: 28px; touch-action: pan-y; }
 .workout-card-peek { position: absolute; z-index: 0; top: 24px; bottom: 24px; width: 74px; overflow: hidden; padding: 0; border: 1px solid var(--line); background: #f7f7f7; color: var(--muted); border-radius: 16px; cursor: pointer; }
 .workout-card-peek.previous { left: -46px; }
@@ -589,18 +593,14 @@ button.nav-item.active { background: var(--soft); }
 .delete-set { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: #aaa; border-radius: 7px; cursor: pointer; }
 .delete-set:hover { background: #e6e6e6; color: #833; }
 .add-set-button { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; padding: 6px 8px; border: 0; background: var(--soft); border-radius: 8px; font-size: 8px; cursor: pointer; }
-.workout-deck-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; }
-.workout-deck-dots button { width: 7px; height: 7px; padding: 0; border: 0; background: #d2d2d2; border-radius: 50%; cursor: pointer; }
-.workout-deck-dots button.active { background: var(--ink); transform: scale(1.2); }
-.workout-deck-dots button.done:not(.active) { background: #777; }
-.workout-swipe-hint { display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted); font-size: 8px; }
+.workout-swipe-hint { display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: -2px; color: var(--muted); font-size: 8px; }
 .workout-deck-empty { padding: 50px 20px; text-align: center; color: var(--muted); }
 .workout-footer { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 16px 28px; background: #fafafa; border-top: 1px solid var(--line); }
 .swipe-workout-footer { grid-template-columns: 1fr auto auto; }
-.workout-swipe-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 42px minmax(180px, 1fr) 42px; gap: 10px; }
-.workout-arrow { width: 42px; height: 42px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); background: #fff; border-radius: 50%; cursor: pointer; }
+.workout-swipe-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 48px minmax(180px, 1fr) 48px; gap: 10px; }
+.workout-arrow { width: 48px; height: 48px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); background: #fff; border-radius: 16px; cursor: pointer; }
 .workout-arrow:disabled { opacity: .3; cursor: default; }
-.complete-set-button { min-height: 42px; border: 0; background: var(--ink); color: #fff; border-radius: 14px; font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
+.complete-set-button { min-height: 48px; border: 0; background: var(--ink); color: #fff; border-radius: 16px; font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
 .complete-set-button:disabled { background: #d2d2d2; color: #777; cursor: default; }
 .workout-footer > div span { display: block; color: var(--muted); font-size: 7px; }
 .workout-footer > div strong { display: block; margin-top: 3px; font-size: 11px; }
@@ -675,12 +675,16 @@ button.nav-item.active { background: var(--soft); }
   .workout-clock { grid-row: 2; grid-column: 1 / -1; width: max-content; }
   .workout-modal-header .modal-close { grid-row: 1; grid-column: 2; }
   .rest-timer-bar { grid-template-columns: auto minmax(0, 1fr) auto auto; padding-inline: 18px; }
-  .workout-deck-status { padding-inline: 18px; font-size: 10px; }
-  .workout-scroll { padding: 14px 10px; }
-  .workout-deck { padding-inline: 20px; }
-  .workout-card-peek.previous { left: -54px; }
-  .workout-card-peek.next { right: -54px; }
-  .workout-swipe-card { padding: 16px; }
+  .workout-deck-status { gap: 10px; padding-inline: 18px; font-size: 10px; }
+  .workout-exercise-picker { width: min(410px, 70%); }
+  .workout-exercise-picker select { height: 44px; font-size: 12px; }
+  .workout-scroll { padding: 12px 8px; }
+  .workout-deck { padding-inline: 6px; }
+  .workout-card-peek { top: 30px; bottom: 30px; width: 44px; }
+  .workout-card-peek.previous { left: -30px; }
+  .workout-card-peek.next { right: -30px; }
+  .workout-card-peek span { display: none; }
+  .workout-swipe-card { padding: 16px; border-radius: 20px; }
   .workout-footer { grid-template-columns: 1fr auto; padding: 14px 18px 18px; }
   .workout-footer .complete-button { grid-column: 1 / -1; }
   .swipe-workout-footer { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
@@ -701,6 +705,11 @@ button.nav-item.active { background: var(--soft); }
   .workout-modal-header p { display: none; }
   .workout-clock { grid-row: auto; grid-column: auto; padding: 7px 9px; }
   .workout-deck-scroll { gap: 9px; padding-block: 10px; }
+  .workout-deck { padding-inline: 0; }
+  .workout-deck-status { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 9px 14px; }
+  .workout-deck-status strong { grid-column: 2; }
+  .workout-exercise-picker { width: 100%; grid-column: 1 / -1; }
+  .workout-exercise-picker select { height: 46px; padding-inline: 12px 30px; font-size: 11px; }
   .workout-swipe-card { min-height: 0; }
   .workout-exercise-title { margin-bottom: 10px; }
   .workout-exercise-title h3 { font-size: 17px; line-height: 1.2; }
@@ -711,7 +720,9 @@ button.nav-item.active { background: var(--soft); }
   .workout-swipe-hint { font-size: 10px; }
   .swipe-workout-footer { gap: 9px; padding: 10px 14px max(12px, env(safe-area-inset-bottom)); }
   .swipe-workout-footer > div:first-child { display: none; }
-  .workout-swipe-actions { grid-template-columns: 42px minmax(0, 1fr) 42px; }
+  .workout-swipe-actions { grid-template-columns: 54px minmax(0, 1fr) 54px; gap: 8px; }
+  .workout-arrow { width: 54px; height: 54px; border-radius: 17px; }
+  .complete-set-button { min-height: 54px; font-size: 12px; }
   .meal-macros { grid-template-columns: 1fr; }
   .history-momentum { gap: 18px; padding: 22px; }
   .history-momentum .momentum-ring { width: 88px; height: 88px; }

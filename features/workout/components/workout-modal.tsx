@@ -132,7 +132,7 @@ export function WorkoutModal({
     if (!start) return;
     const horizontal = clientX - start.x;
     const vertical = clientY - start.y;
-    if (Math.abs(horizontal) < 48 || Math.abs(horizontal) <= Math.abs(vertical)) return;
+    if (Math.abs(horizontal) < 36 || Math.abs(horizontal) <= Math.abs(vertical)) return;
     showExercise(activeIndex + (horizontal < 0 ? 1 : -1));
   }
 
@@ -149,51 +149,64 @@ export function WorkoutModal({
           <button className="modal-close" onClick={() => releaseAudio(close, false)} aria-label="Close workout"><X size={20} /></button>
         </header>
 
-        <div className="workout-deck-status"><span>Exercise {activeIndex + 1} of {workout.exercises.length}</span><strong>{finishedSets}/{totalSets} sets complete</strong></div>
+        <div className="workout-deck-status">
+          <label className="workout-exercise-picker">
+            <span className="sr-only">Choose current exercise</span>
+            <select aria-label="Choose current exercise" value={activeIndex} onChange={(event) => showExercise(Number(event.target.value))}>
+              {workout.exercises.map((exercise, index) => (
+                <option value={index} key={`${exercise.id}:${index}`}>
+                  {String(index + 1).padStart(2, '0')} / {workout.exercises.length} · {exercise.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <strong>{finishedSets}/{totalSets} sets complete</strong>
+        </div>
         <div className="workout-progress"><span style={{ width: `${totalSets ? finishedSets / totalSets * 100 : 0}%` }} /></div>
         {restTimer && <RestTimerPanel timer={restTimer} remaining={restRemaining} addTime={() => updateRestTimer({ ...restTimer, endsAt: restTimer.endsAt + 15000, duration: restTimer.duration + 15 })} skip={() => { updateRestTimer(null); setRestAnnouncement('Rest timer skipped.'); }} />}
         <p className="sr-only" aria-live="assertive">{restAnnouncement}</p>
 
-        <div className="workout-scroll workout-deck-scroll">
+        <div className="workout-scroll workout-deck-scroll" onPointerDown={(event) => {
+          const target = event.target instanceof Element ? event.target : null;
+          if (target?.closest('button, input, select, textarea, a, label, [contenteditable="true"]')) {
+            swipeStart.current = null;
+            return;
+          }
+          event.currentTarget.setPointerCapture(event.pointerId);
+          swipeStart.current = { x: event.clientX, y: event.clientY };
+        }} onPointerUp={(event) => endSwipe(event.clientX, event.clientY)} onPointerCancel={() => { swipeStart.current = null; }}>
           {activeExercise ? (
-            <div className="workout-deck" onPointerDown={(event) => {
-              const target = event.target instanceof Element ? event.target : null;
-              if (target?.closest('button, input, select, textarea, a, label, [contenteditable="true"]')) {
-                swipeStart.current = null;
-                return;
-              }
-              swipeStart.current = { x: event.clientX, y: event.clientY };
-            }} onPointerUp={(event) => endSwipe(event.clientX, event.clientY)} onPointerCancel={() => { swipeStart.current = null; }}>
-              {previousExercise && <button className="workout-card-peek previous" onClick={() => showExercise(activeIndex - 1)} aria-label={`Previous exercise: ${previousExercise.name}`}><span>{previousExercise.name}</span></button>}
-              <section className={`workout-exercise workout-swipe-card ${restTimer?.exerciseId === activeExercise.id ? 'resting' : ''}`} key={activeExercise.id} tabIndex={0} onKeyDown={(event) => { if (event.key === 'ArrowLeft') showExercise(activeIndex - 1); if (event.key === 'ArrowRight') showExercise(activeIndex + 1); }}>
-              <div className="workout-exercise-title">
-                <span>{String(activeIndex + 1).padStart(2, '0')}</span>
-                <div>
-                  <h3>{activeExercise.name}</h3>
-                  <div className="workout-exercise-tags"><b>{activeExercise.category || (activeExercise.type === 'cardio' ? 'CARDIO' : 'STRENGTH')}</b>{activeLevel && <b>L{activeLevel.index} · {activeLevel.name}</b>}</div>
-                  <p>{activeExercise.sets.filter((set) => set.done).length}/{activeExercise.sets.length} complete</p>
-                </div>
+            <>
+              <div className="workout-swipe-hint"><ChevronLeft size={14} /> Swipe anywhere in this area <ChevronRight size={14} /></div>
+              <div className="workout-deck">
+                {previousExercise && <button className="workout-card-peek previous" onClick={() => showExercise(activeIndex - 1)} aria-label={`Previous exercise: ${previousExercise.name}`}><span>{previousExercise.name}</span></button>}
+                <section className={`workout-exercise workout-swipe-card ${restTimer?.exerciseId === activeExercise.id ? 'resting' : ''}`} key={activeExercise.id} tabIndex={0} onKeyDown={(event) => { if (event.key === 'ArrowLeft') showExercise(activeIndex - 1); if (event.key === 'ArrowRight') showExercise(activeIndex + 1); }}>
+                  <div className="workout-exercise-title">
+                    <span>{String(activeIndex + 1).padStart(2, '0')}</span>
+                    <div>
+                      <h3>{activeExercise.name}</h3>
+                      <div className="workout-exercise-tags"><b>{activeExercise.category || (activeExercise.type === 'cardio' ? 'CARDIO' : 'STRENGTH')}</b>{activeLevel && <b>L{activeLevel.index} · {activeLevel.name}</b>}</div>
+                      <p>{activeExercise.sets.filter((set) => set.done).length}/{activeExercise.sets.length} complete</p>
+                    </div>
+                  </div>
+
+                  <ExerciseMetrics exercise={activeExercise} />
+                  <ProgressionGuidance exercise={activeExercise} previous={latestExerciseRecord(latestRecords, activeExercise)} />
+
+                  {activeExercise.type === 'strength' && activeExercise.measurement === 'duration' ? (
+                    <TimedStrengthSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
+                  ) : activeExercise.type === 'strength' ? (
+                    <StrengthSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
+                  ) : (
+                    <CardioSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
+                  )}
+
+                  <button className="add-set-button" onClick={() => addSet(activeExercise.id)}><Plus size={14} /> Add {activeExercise.type === 'cardio' ? 'interval' : 'set'}</button>
+                </section>
+                {nextExercise && <button className="workout-card-peek next" onClick={() => showExercise(activeIndex + 1)} aria-label={`Next exercise: ${nextExercise.name}`}><span>{nextExercise.name}</span></button>}
               </div>
-
-              <ExerciseMetrics exercise={activeExercise} />
-              <ProgressionGuidance exercise={activeExercise} previous={latestExerciseRecord(latestRecords, activeExercise)} />
-
-              {activeExercise.type === 'strength' && activeExercise.measurement === 'duration' ? (
-                <TimedStrengthSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
-              ) : activeExercise.type === 'strength' ? (
-                <StrengthSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
-              ) : (
-                <CardioSetTable exercise={activeExercise} updateSet={updateSet} deleteSet={deleteSet} toggleDone={toggleDone} />
-              )}
-
-              <button className="add-set-button" onClick={() => addSet(activeExercise.id)}><Plus size={14} /> Add {activeExercise.type === 'cardio' ? 'interval' : 'set'}</button>
-              </section>
-              {nextExercise && <button className="workout-card-peek next" onClick={() => showExercise(activeIndex + 1)} aria-label={`Next exercise: ${nextExercise.name}`}><span>{nextExercise.name}</span></button>}
-            </div>
+            </>
           ) : <div className="workout-deck-empty">No exercises in this workout.</div>}
-
-          <div className="workout-deck-dots" aria-label={`Exercise ${activeIndex + 1} of ${workout.exercises.length}`}>{workout.exercises.map((exercise, index) => <button key={`${exercise.id}:${index}`} className={index === activeIndex ? 'active' : exercise.sets.every((set) => set.done) ? 'done' : ''} onClick={() => showExercise(index)} aria-label={`Show ${exercise.name}`} />)}</div>
-          <div className="workout-swipe-hint"><ChevronLeft size={14} /> Swipe to change exercise <ChevronRight size={14} /></div>
         </div>
 
         <footer className="workout-footer swipe-workout-footer">

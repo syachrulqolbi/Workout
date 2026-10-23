@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { createDefaultWorkoutData } from '../../lib/workout-data';
+import { buildWorkout } from '../../lib/workout-session';
 
 test('authenticated mobile shell respects safe spacing and keeps navigation clear', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chrome', 'Mobile shell check');
@@ -135,4 +136,45 @@ test('history correction sheet keeps exercise values compact and uses the produc
   expect(Math.abs((weightBox?.y ?? 0) - (repsBox?.y ?? 0))).toBeLessThanOrEqual(1);
   expect(weightBox?.width).toBeGreaterThan(100);
   expect(repsBox?.width).toBeGreaterThan(100);
+});
+
+test('active workout uses a wide swipe deck with direct exercise navigation', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile-chrome', 'Mobile workout-deck check');
+
+  const data = createDefaultWorkoutData();
+  let setIndex = 0;
+  data.activeWorkout = buildWorkout(data.dayPlans[4], false, [], {
+    now: new Date('2026-10-23T08:30:00.000Z'),
+    createId: () => `set-${setIndex++}`,
+  });
+
+  await page.route('**/api/auth/session', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ user: { email: 'admin@example.com', displayName: 'Syachrul' } }),
+  }));
+  await page.route('**/api/data', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ data, revision: 1, migrated: false, isAdmin: true }),
+  }));
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Resume workout' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Upper volume' });
+  const picker = dialog.getByRole('combobox', { name: 'Choose current exercise' });
+  const card = dialog.locator('.workout-swipe-card');
+  const next = dialog.getByRole('button', { name: 'Next exercise', exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(picker).toBeVisible();
+  await expect(card).toBeVisible();
+
+  const cardBox = await card.boundingBox();
+  const nextBox = await next.boundingBox();
+  expect(cardBox?.width).toBeGreaterThanOrEqual(370);
+  expect(nextBox?.width).toBeGreaterThanOrEqual(54);
+  expect(nextBox?.height).toBeGreaterThanOrEqual(54);
+
+  const pickerBox = await picker.boundingBox();
+  expect(pickerBox?.width).toBeGreaterThanOrEqual(350);
+  await picker.selectOption('1');
+  await expect(card.getByRole('heading', { name: 'Lat pulldown' })).toBeVisible();
 });
