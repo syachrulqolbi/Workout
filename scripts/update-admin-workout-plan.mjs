@@ -40,7 +40,6 @@ const levelStandards = new Map([
   ['exercise-iso-lateral-low-row', [41, 50.5, 60, 72, 84, 98, 112, 122, 132, 142]],
   ['exercise-hi-lo-cable-chest-fly', [7, 12.5, 18, 26.5, 35, 46, 57, 66, 75, 84]],
   ['exercise-shrugs', [28, 40, 52, 68, 84, 104, 124, 139.5, 154.5, 170]],
-  ['exercise-cable-shrugs', [37, 51, 65, 83, 101, 123.5, 146, 162.5, 179.5, 196]],
   ['exercise-cable-woodchopper', [7, 13, 19, 27.5, 36, 48, 60, 69.5, 78.5, 88]],
 ]);
 
@@ -148,8 +147,7 @@ const dayPlans = [
       strength({ id: 'fri-low-row', name: 'Iso lateral low row (B)', category: 'PULL', priority: true, prescription: '3×6–8', current: '70 total', target: '137 total', weight: 70, reps: 8, sets: 3, restSeconds: 90, restLabel: '90 sec' }),
       strength({ id: 'fri-cable-chest-fly', name: 'Hi-lo cable chest fly', category: 'PUSH', prescription: '2×12–15', current: '30 total', target: '97 total', weight: 30, reps: 15, sets: 2, restSeconds: 60, restLabel: '60 sec' }),
       strength({ id: 'fri-lateral-raise', name: 'Lateral raise', category: 'PUSH', prescription: '2×12–15', current: '69 total', target: '117 total', weight: 69, reps: 15, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
-      strength({ id: 'fri-shrugs', name: 'Shrugs (A)', category: 'PULL', prescription: '2×12–15', current: '55 total', target: '171 total', weight: 55, reps: 15, sets: 2, restSeconds: 60, restLabel: '60 sec' }),
-      strength({ id: 'fri-cable-shrugs', name: 'Cable shrugs (B)', category: 'PULL', prescription: '2×12–15', current: '55 total', target: '171 total', weight: 55, reps: 15, sets: 2, restSeconds: 60, restLabel: '60 sec' }),
+      strength({ id: 'fri-shrugs', name: 'Shrugs', category: 'PULL', prescription: '2×12–15', current: '55 total', target: '171 total', weight: 55, reps: 15, sets: 2, restSeconds: 60, restLabel: '60 sec' }),
       strength({ id: 'fri-back-extension', name: 'Loaded back extension (A)', category: 'POSTURE', prescription: '2×10–15', current: '20', target: '50', weight: 20, reps: 15, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
       strength({ id: 'fri-face-pull', name: 'Face pull (B)', category: 'POSTURE', prescription: '2×12–15', current: '47.5 total', target: '96 total', weight: 47.5, reps: 15, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
       strength({ id: 'fri-woodchopper', name: 'Cable Woodchopper', category: 'CORE', priority: true, prescription: '2×12', current: '13 total', target: '88 total', weight: 13, reps: 12, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
@@ -166,15 +164,25 @@ function historyKey(name) {
   return String(name ?? '').trim().replace(/\s*\([A-Z]\)\s*$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+function migratedExerciseName(name) {
+  const key = historyKey(name);
+  if (key === 'cable curl') return null;
+  if (key === 'bicep curl') return 'Bicep curl';
+  if (key === 'cable crunch' || key === 'cable woodchopper') return 'Cable Woodchopper';
+  if (key === 'shrug' || key === 'shrugs' || key === 'cable shrug' || key === 'cable shrugs') return 'Shrugs';
+  return String(name ?? 'Exercise');
+}
+
+function completedSetCount(exercise) {
+  return (Array.isArray(exercise?.sets) ? exercise.sets : []).filter((set) => set?.done).length;
+}
+
 function migrateActiveWorkout(activeWorkout) {
   if (!activeWorkout || !Array.isArray(activeWorkout.exercises)) return activeWorkout ?? null;
   const planExercises = dayPlans.flatMap((plan) => plan.exercises);
-  const migratedExercises = activeWorkout.exercises.flatMap((exercise) => {
-    const key = historyKey(exercise?.name);
-    if (key === 'cable curl') return [];
-    const nextName = key === 'bicep curl' ? 'Bicep curl'
-      : key === 'cable crunch' || key === 'cable woodchopper' ? 'Cable Woodchopper'
-      : String(exercise?.name ?? 'Exercise');
+  const migrated = activeWorkout.exercises.flatMap((exercise) => {
+    const nextName = migratedExerciseName(exercise?.name);
+    if (!nextName) return [];
     const planned = planExercises.find((item) => item.id === stableExerciseId(nextName));
     if (!planned) return [{ ...exercise, id: stableExerciseId(nextName), name: nextName }];
     return [{
@@ -189,7 +197,20 @@ function migrateActiveWorkout(activeWorkout) {
       }),
     }];
   });
-  return { ...activeWorkout, exercises: migratedExercises };
+  const migratedExercises = [];
+  for (const exercise of migrated) {
+    const duplicateIndex = migratedExercises.findIndex((candidate) => candidate.id === exercise.id);
+    if (duplicateIndex < 0) migratedExercises.push(exercise);
+    else if (completedSetCount(exercise) > completedSetCount(migratedExercises[duplicateIndex])) migratedExercises[duplicateIndex] = exercise;
+  }
+  const restName = migratedExerciseName(activeWorkout.restTimer?.exerciseName);
+  const restExercise = restName ? planExercises.find((item) => item.id === stableExerciseId(restName)) : null;
+  const restTimer = activeWorkout.restTimer && restName ? {
+    ...activeWorkout.restTimer,
+    exerciseId: restExercise?.id ?? stableExerciseId(restName),
+    exerciseName: restExercise?.name ?? restName,
+  } : activeWorkout.restTimer ?? null;
+  return { ...activeWorkout, exercises: migratedExercises, restTimer };
 }
 
 function canonical(value) {
@@ -322,4 +343,4 @@ const accessToken = process.env.GCP_ACCESS_TOKEN;
 if (accessToken) await updateWithRest(accessToken);
 else await updateWithSdk();
 
-if (apply) console.log('Workout plan updated to the Level 1 upper limits. Exercise history, meals, and schedule overrides were preserved.');
+if (apply) console.log('Workout plan updated. Exercise history, meals, and schedule overrides were preserved.');

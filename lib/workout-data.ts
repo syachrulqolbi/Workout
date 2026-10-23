@@ -302,7 +302,8 @@ function nonNegative(value: unknown, fallback = 0, maximum = 1_000_000) {
   return Math.min(maximum, Math.max(0, number(value, fallback)));
 }
 function exerciseIdentity(value: unknown) {
-  return String(value ?? '').trim().replace(/\s*\([AB]\)\s*$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+  const identity = String(value ?? '').trim().replace(/\s*\([AB]\)\s*$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return identity === 'cable shrug' || identity === 'cable shrugs' || identity === 'shrug' ? 'shrugs' : identity;
 }
 
 function exerciseMeasurement(value: unknown, type: ExerciseType, name: string, distanceKm = 0): ExerciseMeasurement {

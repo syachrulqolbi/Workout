@@ -26,6 +26,12 @@ describe('workout identity', () => {
     expect(latestExerciseRecord(index, { id: 'exercise-seated-cable-row', name: 'Close-grip seated row' })?.id).toBe('newer');
   });
 
+  it('shares shrug history across the removed cable variant', () => {
+    const cableShrug = record({ id: 'cable', exerciseId: 'exercise-cable-shrugs', exercise: 'Cable shrugs (B)', weight: 55 });
+    const index = indexLatestExerciseRecords([cableShrug]);
+    expect(latestExerciseRecord(index, { id: 'exercise-shrugs', name: 'Shrugs' })?.id).toBe('cable');
+  });
+
   it('matches renamed plans by plan day while supporting legacy sessions by name', () => {
     expect(workoutMatchesPlan(session({ name: 'Renamed leg day' }), 1, 'Leg')).toBe(true);
     expect(workoutMatchesPlan(session({ planDay: null, name: 'Legacy plan' }), 4, 'Legacy plan')).toBe(true);

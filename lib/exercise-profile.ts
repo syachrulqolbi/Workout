@@ -95,6 +95,10 @@ const EXERCISE_NAME_ALIASES: Record<string, string> = {
   'walking treadmill': 'Incline walk',
   'cable crunch': 'Cable Woodchopper',
   'cable woodchopper': 'Cable Woodchopper',
+  'cable shrug': 'Shrugs',
+  'cable shrugs': 'Shrugs',
+  'shrug': 'Shrugs',
+  'shrugs': 'Shrugs',
 };
 
 export function canonicalExerciseName(name: string) {
@@ -102,7 +106,8 @@ export function canonicalExerciseName(name: string) {
   const pairMarker = trimmed.match(/\s*\(([AB])\)\s*$/i)?.[1]?.toUpperCase();
   const withoutPairMarker = trimmed.replace(/\s*\([AB]\)\s*$/i, '');
   const canonical = EXERCISE_NAME_ALIASES[normalizedName(withoutPairMarker)] ?? withoutPairMarker;
-  return pairMarker && !/\s\([AB]\)$/i.test(canonical) ? `${canonical} (${pairMarker})` : canonical;
+  const keepPairMarker = normalizedName(canonical) !== 'shrugs';
+  return pairMarker && keepPairMarker && !/\s\([AB]\)$/i.test(canonical) ? `${canonical} (${pairMarker})` : canonical;
 }
 
 export function exerciseNamesMatch(left: string, right: string) {
