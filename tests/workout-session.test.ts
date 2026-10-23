@@ -52,4 +52,27 @@ describe('buildWorkout', () => {
     });
     expect(workout.exercises[0].targetWeight).toBe(44.5);
   });
+
+  it('starts the next Plank workout from the latest achieved weight and hold time', () => {
+    const standard = {
+      thresholds: [0, 0, 0, 0, 5, 10, 15, 25, 35, 40],
+      holdSeconds: [20, 30, 45, 60, 30, 45, 60, 60, 60, 60],
+      metric: 'weightedHold' as const,
+      unit: 'level' as const,
+    };
+    const plankPlan: DayPlan = { ...plan, exercises: [{
+      ...plan.exercises[0], id: 'exercise-plank', name: 'Plank', measurement: 'duration', loadMode: 'duration',
+      weight: 0, reps: 0, durationSeconds: 20, levelStandard: standard,
+    }] };
+    const history: ExerciseRecord = {
+      ...record(5), exerciseId: 'exercise-plank', exercise: 'Plank', measurement: 'duration', loadMode: 'duration',
+      reps: 0, durationSeconds: 60, completedSets: [
+        { weight: 5, reps: 0, durationSeconds: 30, durationMinutes: 0, distanceKm: 0, calories: 0 },
+        { weight: 0, reps: 0, durationSeconds: 60, durationMinutes: 0, distanceKm: 0, calories: 0 },
+      ],
+    };
+    const workout = buildWorkout(plankPlan, false, [history], { createId: () => 'set-id' });
+    expect(workout.exercises[0].targetWeight).toBe(5);
+    expect(workout.exercises[0].targetDurationSeconds).toBe(30);
+  });
 });

@@ -1,6 +1,10 @@
 import type { ExerciseEntry, SetEntry } from '@/lib/workout-data';
+import { bestWeightedHoldPerformance, isWeightedHoldStandard } from '@/lib/exercise-profile';
 
 export function bestCompletedSet(exercise: ExerciseEntry, sets = exercise.sets.filter((set) => set.done)) {
+  if (isWeightedHoldStandard(exercise.levelStandard)) {
+    return bestWeightedHoldPerformance(exercise.levelStandard, sets);
+  }
   return sets.reduce<SetEntry | null>((best, set) => {
     if (!best) return set;
     if (exercise.measurement === 'duration') return set.durationSeconds > best.durationSeconds ? set : best;

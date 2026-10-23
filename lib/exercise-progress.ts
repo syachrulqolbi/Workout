@@ -1,18 +1,20 @@
 import type {
-  ExerciseLevelMetric,
+  ExerciseLevelMetric, ExerciseLevelStandard,
   ExerciseRecord,
   LibraryExercise,
 } from '@/lib/workout-data';
+import { bestWeightedHoldPerformance, weightedHoldLevel } from '@/lib/exercise-profile';
 import { stableExerciseId } from '@/lib/workout-schema.mjs';
 
 export type CardioProgressMetric = 'durationMinutes' | 'distanceKm' | 'calories';
-export type ExerciseProgressMetric = 'weight' | 'reps' | 'durationSeconds' | CardioProgressMetric;
+export type ExerciseProgressMetric = 'weight' | 'reps' | 'durationSeconds' | 'level' | CardioProgressMetric;
 
 export type ExerciseProgressDefinition = {
   metric: ExerciseProgressMetric;
-  unit: 'kg' | 'reps' | 'sec' | 'min' | 'km' | 'kcal';
+  unit: 'kg' | 'reps' | 'sec' | 'min' | 'km' | 'kcal' | 'level';
   label: string;
   inverse: boolean;
+  levelStandard?: ExerciseLevelStandard;
 };
 
 type PlannedExercise = Pick<LibraryExercise,
@@ -39,6 +41,9 @@ export function exerciseProgressDefinition(
   }
 
   const metric = strengthMetric(exercise, record);
+  if (metric === 'weightedHold' && exercise?.levelStandard) {
+    return { metric: 'level', unit: 'level', label: 'Achieved plank level', inverse: false, levelStandard: exercise.levelStandard };
+  }
   if (metric === 'seconds') return { metric: 'durationSeconds', unit: 'sec', label: 'Best hold', inverse: false };
   if (metric === 'reps') return { metric: 'reps', unit: 'reps', label: 'Best repetitions', inverse: false };
   if (metric === 'assistanceEquivalent' || exercise?.loadMode === 'assistance' || record?.loadMode === 'assistance') {
@@ -59,6 +64,14 @@ function finite(values: number[]) {
 }
 
 export function exerciseRecordProgressValue(record: ExerciseRecord, definition: ExerciseProgressDefinition) {
+  if (definition.metric === 'level') {
+    if (!definition.levelStandard) return 1;
+    const completed = record.completedSets.filter((set) => set.durationSeconds > 0);
+    const fallbackSeconds = record.setsCompleted ? record.durationSeconds / record.setsCompleted : record.durationSeconds;
+    const performances = completed.length ? completed : [{ weight: record.weight, durationSeconds: fallbackSeconds }];
+    const best = bestWeightedHoldPerformance(definition.levelStandard, performances);
+    return best ? weightedHoldLevel(definition.levelStandard, best.weight, best.durationSeconds) : 1;
+  }
   if (definition.metric === 'weight') {
     const values = finite(record.completedSets.map((set) => set.weight));
     if (!values.length) return Math.max(0, record.weight);
@@ -77,6 +90,10 @@ export function exerciseRecordProgressValue(record: ExerciseRecord, definition: 
 }
 
 export function exercisePlanProgressValue(exercise: PlannedExercise, definition: ExerciseProgressDefinition) {
+  if (definition.metric === 'level') {
+    if (!definition.levelStandard) return 1;
+    return weightedHoldLevel(definition.levelStandard, exercise.weight, exercise.durationSeconds);
+  }
   if (definition.metric === 'weight') return Math.max(0, exercise.weight);
   if (definition.metric === 'reps') return Math.max(0, exercise.reps);
   if (definition.metric === 'durationSeconds') return Math.max(0, exercise.durationSeconds);

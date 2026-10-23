@@ -13,7 +13,7 @@ import type { NutritionDraft } from '@/features/workout/components/meal-modal';
 import { SettingsView } from '@/features/workout/components/settings-view';
 import type { AppUser } from '@/lib/auth-user';
 import { authenticatedFetch } from '@/lib/client/authenticated-fetch';
-import { canonicalExerciseName } from '@/lib/exercise-profile';
+import { canonicalExerciseName, isWeightedHoldStandard, weightedHoldLevel } from '@/lib/exercise-profile';
 import {
   compactDatePlanOverrides, compactMealCompletionDates, createDefaultWorkoutData, DAY_NAMES, isWorkoutData, normalizeWorkoutData, stableExerciseId,
   type ActiveWorkout, type DayPlan, type LibraryExercise, type Meal,
@@ -546,7 +546,10 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
       const inverseLoad = exercise.loadMode === 'assistance';
       const targetMet = completed.length === exercise.sets.length && completed.every((set) => exercise.type === 'strength'
         ? exercise.measurement === 'duration'
-          ? set.durationSeconds >= exercise.targetDurationSeconds
+          ? isWeightedHoldStandard(exercise.levelStandard)
+            ? weightedHoldLevel(exercise.levelStandard, set.weight, set.durationSeconds)
+              >= weightedHoldLevel(exercise.levelStandard, exercise.targetWeight, exercise.targetDurationSeconds)
+            : set.durationSeconds >= exercise.targetDurationSeconds
           : (inverseLoad ? set.weight <= exercise.targetWeight : set.weight >= exercise.targetWeight) && set.reps >= exercise.targetReps
         : set.durationMinutes >= exercise.targetDurationMinutes && (!exercise.targetDistanceKm || set.distanceKm >= exercise.targetDistanceKm));
       return completed.length ? [{

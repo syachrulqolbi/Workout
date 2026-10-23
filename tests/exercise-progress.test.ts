@@ -55,6 +55,25 @@ describe('exercise progress metrics', () => {
     expect(exercisePlanProgressValue(plan, definition)).toBe(20);
   });
 
+  it('charts weighted Plank progress by achieved level', () => {
+    const standard = {
+      thresholds: [0, 0, 0, 0, 5, 10, 15, 25, 35, 40],
+      holdSeconds: [20, 30, 45, 60, 30, 45, 60, 60, 60, 60],
+      metric: 'weightedHold' as const,
+      unit: 'level' as const,
+    };
+    const plan = exercise({ id: 'exercise-plank', name: 'Plank', measurement: 'duration', loadMode: 'duration',
+      weight: 0, reps: 0, durationSeconds: 20, levelStandard: standard });
+    const definition = exerciseProgressDefinition(plan);
+    const history = record({ exerciseId: plan.id, exercise: plan.name, measurement: 'duration', loadMode: 'duration',
+      weight: 5, reps: 0, durationSeconds: 30, completedSets: [
+        { weight: 5, reps: 0, durationSeconds: 30, durationMinutes: 0, distanceKm: 0, calories: 0 },
+      ] });
+    expect(definition.metric).toBe('level');
+    expect(exerciseRecordProgressValue(history, definition)).toBe(5);
+    expect(exercisePlanProgressValue(plan, definition)).toBe(1);
+  });
+
   it('marks machine assistance as inverse progress and chooses the lowest set', () => {
     const plan = exercise({ loadMode: 'assistance', weight: 28.5 });
     const definition = exerciseProgressDefinition(plan);

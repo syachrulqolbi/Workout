@@ -831,6 +831,7 @@ button.nav-item.active { background: var(--soft); }
 .danger-button.subtle { border-color: var(--line); background: #fff; color: var(--ink); }
 .set-table.cardio .set-head, .set-table.cardio .set-row { grid-template-columns: 44px 1fr 1fr 1fr 54px 34px; }
 .set-table.timed-strength .set-head, .set-table.timed-strength .set-row { grid-template-columns: 44px 1fr 54px 34px; }
+.set-table.timed-strength.weighted-hold .set-head, .set-table.timed-strength.weighted-hold .set-row { grid-template-columns: 38px 1fr 1fr 54px 34px; }
 
 @media (max-width: 980px) {
   .calendar-view { grid-template-columns: 1fr; }

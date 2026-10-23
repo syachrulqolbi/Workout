@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   DAY_NAMES, DAY_SHORT, type DayPlan, type ExerciseLoadMode, type ExerciseMeasurement, type ExerciseType, type LibraryExercise,
 } from '@/lib/workout-data';
+import { isWeightedHoldStandard } from '@/lib/exercise-profile';
 import { useDialogAccessibility } from '@/features/workout/hooks/use-dialog-accessibility';
 
 type ExerciseLibraryModalProps = {
@@ -145,6 +146,7 @@ function ExerciseEditor({ day, exercise, update, remove }: {
   update: ExerciseLibraryModalProps['update'];
   remove: ExerciseLibraryModalProps['remove'];
 }) {
+  const weightedHold = isWeightedHoldStandard(exercise.levelStandard);
   return (
     <article className="library-item">
       <div className="library-item-heading">
@@ -165,6 +167,7 @@ function ExerciseEditor({ day, exercise, update, remove }: {
               : { measurement, loadMode: exercise.loadMode === 'duration' ? 'total' : exercise.loadMode, durationSeconds: 0, reps: exercise.reps || 8 }); }}><option value="reps">Repetitions</option><option value="duration">Timed hold</option></select></label>
             {exercise.measurement === 'reps' && <label><span>LOAD</span><select value={exercise.loadMode} onChange={(event) => { const loadMode = event.target.value as ExerciseLoadMode; update(day, exercise.id, { loadMode, weight: loadMode === 'bodyweight' ? 0 : exercise.weight }); }}><option value="total">Total kg</option><option value="perSide">Kg per side</option><option value="assistance">Assistance</option><option value="bodyweight">Bodyweight</option></select></label>}
             {exercise.measurement === 'reps' && exercise.loadMode !== 'bodyweight' && <EditableNumber label="KG" value={exercise.weight} min={0} step={0.5} onChange={(value) => update(day, exercise.id, { weight: value })} />}
+            {exercise.measurement === 'duration' && weightedHold && <EditableNumber label="ADDED KG" value={exercise.weight} min={0} step={0.5} onChange={(value) => update(day, exercise.id, { weight: value })} />}
             <EditableNumber label="SETS" value={exercise.sets} min={1} onChange={(value) => update(day, exercise.id, { sets: value })} />
             {exercise.measurement === 'duration'
               ? <EditableNumber label="SECONDS" value={exercise.durationSeconds} min={1} onChange={(value) => update(day, exercise.id, { durationSeconds: value })} />

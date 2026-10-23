@@ -28,6 +28,25 @@ describe('workout metrics', () => {
     expect(bestCompletedSet(strength, [set({ weight: 30, reps: 6 }), set({ weight: 30, reps: 9 })])?.reps).toBe(9);
   });
 
+  it('uses the highest completed Plank milestone as the best timed set', () => {
+    const weightedPlank = exercise({
+      id: 'exercise-plank', name: 'Plank', measurement: 'duration', loadMode: 'duration',
+      targetWeight: 0, targetReps: 0, targetDurationSeconds: 20,
+      levelStandard: {
+        thresholds: [0, 0, 0, 0, 5, 10, 15, 25, 35, 40],
+        holdSeconds: [20, 30, 45, 60, 30, 45, 60, 60, 60, 60],
+        metric: 'weightedHold', unit: 'level',
+      },
+    });
+    const best = bestCompletedSet(weightedPlank, [
+      set({ weight: 0, durationSeconds: 60 }),
+      set({ weight: 5, durationSeconds: 30 }),
+      set({ weight: 40, durationSeconds: 20 }),
+    ]);
+    expect(best?.weight).toBe(5);
+    expect(best?.durationSeconds).toBe(30);
+  });
+
   it('doubles per-side load and excludes bodyweight and assistance from volume', () => {
     const completed = set({ weight: 12.5, reps: 10 });
     expect(completedSetVolume(exercise({ loadMode: 'perSide' }), completed)).toBe(250);

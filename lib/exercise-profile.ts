@@ -1,4 +1,7 @@
-import { stableExerciseId, type ExerciseEntry, type ExerciseLoadMode, type ExerciseRecord, type LibraryExercise } from '@/lib/workout-data';
+import {
+  stableExerciseId, type ExerciseEntry, type ExerciseLevelMetric, type ExerciseLevelStandard,
+  type ExerciseLoadMode, type ExerciseRecord, type LibraryExercise,
+} from '@/lib/workout-data';
 import { levelIndexForThresholds } from '@/lib/workout-schema.mjs';
 
 export type MuscleGroup =
@@ -130,6 +133,38 @@ export function isLoadedBackExtension(exercise: { id?: string; name: string }) {
     || stableExerciseId(exercise.name) === 'exercise-loaded-back-extension';
 }
 
+export function isPlankExercise(exercise: { id?: string; name: string }) {
+  return exercise.id === 'exercise-plank' || stableExerciseId(exercise.name) === 'exercise-plank';
+}
+
+export function isWeightedHoldStandard(standard?: ExerciseLevelStandard | null): standard is ExerciseLevelStandard & { holdSeconds: number[] } {
+  return standard?.metric === 'weightedHold' && standard.thresholds.length === 10
+    && standard.holdSeconds?.length === 10;
+}
+
+export function weightedHoldLevel(standard: ExerciseLevelStandard, weight: number, seconds: number) {
+  if (!isWeightedHoldStandard(standard)) return 1;
+  let level = 1;
+  standard.thresholds.forEach((requiredWeight, index) => {
+    if (weight >= requiredWeight && seconds >= standard.holdSeconds[index]) level = index + 1;
+  });
+  return level;
+}
+
+export function bestWeightedHoldPerformance<T extends { weight: number; durationSeconds: number }>(
+  standard: ExerciseLevelStandard,
+  performances: T[],
+) {
+  return performances.reduce<T | null>((best, performance) => {
+    if (!best) return performance;
+    const level = weightedHoldLevel(standard, performance.weight, performance.durationSeconds);
+    const bestLevel = weightedHoldLevel(standard, best.weight, best.durationSeconds);
+    if (level !== bestLevel) return level > bestLevel ? performance : best;
+    if (performance.weight !== best.weight) return performance.weight > best.weight ? performance : best;
+    return performance.durationSeconds > best.durationSeconds ? performance : best;
+  }, null);
+}
+
 function rounded(value: number) {
   return Math.round(value * 2) / 2;
 }
@@ -144,11 +179,14 @@ export type StrengthLevel = {
   isAssistance: boolean;
   hasHistory: boolean;
   loadMode: ExerciseLoadMode;
-  metric: 'weight' | 'reps' | 'seconds' | 'assistanceEquivalent';
-  unit: 'kg' | 'reps' | 'sec';
+  metric: ExerciseLevelMetric;
+  unit: 'kg' | 'reps' | 'sec' | 'level';
   ranges: Array<{ min: number; max: number | null }>;
   levelNames?: readonly string[];
   isAddedWeight?: boolean;
+  milestones?: Array<{ weight: number; seconds: number }>;
+  bestWeight?: number;
+  bestSeconds?: number;
 };
 
 function explicitLevelRanges(thresholds: number[]) {
@@ -263,13 +301,35 @@ export function strengthLevelForExercise(exercise: LibraryExercise, history: Exe
   const plannedLoad = Math.max(0, exercise.weight);
 
   if (exercise.levelStandard) {
-    const { thresholds, metric, unit } = exercise.levelStandard;
+    const { thresholds, metric, unit, holdSeconds } = exercise.levelStandard;
     const ranges = explicitLevelRanges(thresholds);
     const exerciseKey = stableExerciseId(canonicalExerciseName(exercise.name));
     const pullUpProgression = exerciseKey === 'exercise-pull-up'
       && metric === 'assistanceEquivalent';
     const backExtensionProgression = exerciseKey === 'exercise-loaded-back-extension' && metric === 'weight';
-    const levelNames = pullUpProgression || backExtensionProgression ? CUSTOM_TRAINING_LEVEL_NAMES : undefined;
+    const weightedHoldProgression = metric === 'weightedHold' && holdSeconds?.length === 10;
+    const levelNames = pullUpProgression || backExtensionProgression || weightedHoldProgression
+      ? CUSTOM_TRAINING_LEVEL_NAMES
+      : undefined;
+    if (weightedHoldProgression) {
+      const historyPerformances = matches.flatMap((record) => {
+        const completed = record.completedSets.filter((set) => set.durationSeconds > 0);
+        if (completed.length) return completed;
+        const seconds = record.setsCompleted ? record.durationSeconds / record.setsCompleted : record.durationSeconds;
+        return seconds > 0 ? [{ weight: record.weight, durationSeconds: seconds }] : [];
+      });
+      const planPerformance = { weight: exercise.weight, durationSeconds: exercise.durationSeconds };
+      const best = bestWeightedHoldPerformance(exercise.levelStandard, [planPerformance, ...historyPerformances]) ?? planPerformance;
+      const index = weightedHoldLevel(exercise.levelStandard, best.weight, best.durationSeconds);
+      const milestones = thresholds.map((weight, milestoneIndex) => ({ weight, seconds: holdSeconds[milestoneIndex] }));
+      return {
+        index, ...STRENGTH_LEVELS[index - 1], name: levelNames?.[index - 1] ?? STRENGTH_LEVELS[index - 1].name,
+        load: index, rangeMin: index, rangeMax: index,
+        isAssistance: false, hasHistory: historyPerformances.length > 0, loadMode: exercise.loadMode,
+        metric, unit, ranges: milestones.map((_, milestoneIndex) => ({ min: milestoneIndex + 1, max: milestoneIndex + 1 })),
+        levelNames, milestones, bestWeight: rounded(best.weight), bestSeconds: rounded(best.durationSeconds),
+      };
+    }
     const historyValues = matches.flatMap((record) => {
       if (metric === 'weight') return [record.weight];
       if (metric === 'assistanceEquivalent') return [record.loadMode === 'assistance' ? -record.weight : record.weight];

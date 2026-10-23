@@ -3,7 +3,7 @@
 import { Save, X } from 'lucide-react';
 import { FormEvent } from 'react';
 import { useDialogAccessibility } from '@/features/workout/hooks/use-dialog-accessibility';
-import { canonicalExerciseName, isLoadedBackExtension } from '@/lib/exercise-profile';
+import { canonicalExerciseName, isLoadedBackExtension, isPlankExercise } from '@/lib/exercise-profile';
 import type { ExerciseRecord, WorkoutSession } from '@/lib/workout-data';
 
 function localDateTimeValue(value: string) {
@@ -43,7 +43,9 @@ export function HistorySessionModal({ workout, records, close, save }: {
       const completedSets = record.completedSets.map((set) => ({
         ...set,
         ...(record.type === 'strength' && record.measurement === 'reps' ? { weight, reps } : {}),
-        ...(record.type === 'strength' && record.measurement === 'duration' ? { durationSeconds: durationSeconds / divisor } : {}),
+        ...(record.type === 'strength' && record.measurement === 'duration'
+          ? { weight: isPlankExercise({ id: record.exerciseId, name: record.exercise }) ? weight : set.weight, durationSeconds: durationSeconds / divisor }
+          : {}),
         ...(record.type === 'cardio' ? { durationMinutes: durationMinutes / divisor, distanceKm: distanceKm / divisor, calories: calories / divisor } : {}),
       }));
       return { ...record, date, weight, reps, durationSeconds, durationMinutes, distanceKm, calories, completedSets };
@@ -135,10 +137,16 @@ export function HistorySessionModal({ workout, records, close, save }: {
                     </>
                   )}
                   {record.type === 'strength' && record.measurement === 'duration' && (
-                    <label>
-                      <span>TOTAL SECONDS</span>
-                      <input type="number" min="0" step="1" name={`record-${record.id}-seconds`} defaultValue={record.durationSeconds} />
-                    </label>
+                    <>
+                      {isPlankExercise({ id: record.exerciseId, name: record.exercise }) && <label>
+                        <span>ADDED KG</span>
+                        <input type="number" min="0" step="0.5" name={`record-${record.id}-weight`} defaultValue={record.weight} />
+                      </label>}
+                      <label>
+                        <span>TOTAL SECONDS</span>
+                        <input type="number" min="0" step="1" name={`record-${record.id}-seconds`} defaultValue={record.durationSeconds} />
+                      </label>
+                    </>
                   )}
                   {record.type === 'cardio' && (
                     <>

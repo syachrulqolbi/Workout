@@ -2,7 +2,10 @@
 
 import { Check, ChevronLeft, ChevronRight, Clock3, Plus, Timer, TrendingUp, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isLoadedBackExtension, strengthLevelForWorkoutExercise } from '@/lib/exercise-profile';
+import {
+  bestWeightedHoldPerformance, isLoadedBackExtension, isWeightedHoldStandard,
+  strengthLevelForWorkoutExercise, weightedHoldLevel,
+} from '@/lib/exercise-profile';
 import { type ActiveRestTimer, type ActiveWorkout, type ExerciseEntry, type ExerciseRecord, type LibraryExercise, type SetEntry } from '@/lib/workout-data';
 import { indexLatestExerciseRecords, latestExerciseRecord } from '@/lib/workout-identity';
 import { formatTimer } from '@/lib/workout-ui';
@@ -212,7 +215,9 @@ export function WorkoutModal({
 }
 
 function ExerciseMetrics({ exercise }: { exercise: ExerciseEntry }) {
+  const weightedHold = isWeightedHoldStandard(exercise.levelStandard);
   const load = exercise.type === 'cardio' ? `${exercise.targetDurationMinutes} min`
+    : weightedHold ? `${exercise.targetWeight ? `+${exercise.targetWeight} kg` : 'Bodyweight'} · ${exercise.targetDurationSeconds} sec`
     : exercise.measurement === 'duration' ? `${exercise.targetDurationSeconds} sec`
     : exercise.loadMode === 'bodyweight' ? 'Bodyweight'
     : exercise.loadMode === 'assistance' ? `${exercise.targetWeight} kg assist`
@@ -264,12 +269,14 @@ function StrengthSetTable({ exercise, updateSet, deleteSet, toggleDone }: SetTab
 }
 
 function TimedStrengthSetTable({ exercise, updateSet, deleteSet, toggleDone }: SetTableProps) {
+  const weightedHold = isWeightedHoldStandard(exercise.levelStandard);
   return (
-    <div className="set-table timed-strength">
-      <div className="set-head"><span>SET</span><span>SECONDS</span><span>DONE</span><span /></div>
+    <div className={`set-table timed-strength ${weightedHold ? 'weighted-hold' : ''}`}>
+      <div className="set-head"><span>SET</span>{weightedHold && <span>ADDED KG</span>}<span>SECONDS</span><span>DONE</span><span /></div>
       {exercise.sets.map((set, index) => (
         <div className={`set-row ${set.done ? 'completed' : ''}`} key={set.id}>
           <strong>{index + 1}</strong>
+          {weightedHold && <input type="number" min="0" step="0.5" value={set.weight} onChange={(event) => updateSet(exercise.id, set.id, 'weight', Number(event.target.value))} aria-label={`${exercise.name} set ${index + 1} added weight`} />}
           <input type="number" min="1" step="1" value={set.durationSeconds} onChange={(event) => updateSet(exercise.id, set.id, 'durationSeconds', Number(event.target.value))} aria-label={`${exercise.name} set ${index + 1} duration in seconds`} />
           <SetActions exercise={exercise} set={set} index={index} unit="set" deleteSet={deleteSet} toggleDone={toggleDone} />
         </div>
@@ -332,6 +339,33 @@ function ProgressionGuidance({ exercise, previous }: { exercise: ExerciseEntry; 
   }
 
   if (exercise.measurement === 'duration') {
+    if (isWeightedHoldStandard(exercise.levelStandard)) {
+      const standard = exercise.levelStandard;
+      const targetLevel = weightedHoldLevel(standard, exercise.targetWeight, exercise.targetDurationSeconds);
+      const currentMet = completed.length === exercise.sets.length && completed.every((set) =>
+        weightedHoldLevel(standard, set.weight, set.durationSeconds) >= targetLevel);
+      const previousSets = previous?.completedSets.filter((set) => set.durationSeconds > 0) ?? [];
+      const previousFallback = previous ? [{
+        weight: previous.weight,
+        durationSeconds: previous.setsCompleted ? previous.durationSeconds / previous.setsCompleted : previous.durationSeconds,
+      }] : [];
+      const previousBest = bestWeightedHoldPerformance(standard, previousSets.length ? previousSets : previousFallback);
+      const previousLevel = previousBest ? weightedHoldLevel(standard, previousBest.weight, previousBest.durationSeconds) : 0;
+      const ready = currentMet || (!completed.length && Boolean(previous?.targetMet));
+      const nextLevel = Math.min(10, Math.max(targetLevel, previousLevel) + (ready ? 1 : 0));
+      const nextWeight = standard.thresholds[nextLevel - 1];
+      const nextSeconds = standard.holdSeconds[nextLevel - 1];
+      const formatTarget = (weight: number, seconds: number) => `${weight ? `+${weight} kg` : 'bodyweight'} for ${seconds} sec`;
+      const previousText = previousBest
+        ? `Previous best · L${previousLevel} · ${formatTarget(previousBest.weight, previousBest.durationSeconds)}`
+        : 'No previous plank session logged';
+      const advice = ready && targetLevel < 10
+        ? `${currentMet ? 'Target reached. Next session' : 'Previous target complete. Today'} try Level ${nextLevel}: ${formatTarget(nextWeight, nextSeconds)} per set.`
+        : targetLevel === 10 && currentMet
+          ? 'Elite target reached. Keep the hold controlled and repeat it with consistent form.'
+          : `Complete every work set at Level ${targetLevel}: ${formatTarget(exercise.targetWeight, exercise.targetDurationSeconds)}.`;
+      return <ProgressionDetails achieved={currentMet} previousText={previousText} advice={advice} />;
+    }
     const currentMet = completed.length === exercise.sets.length && completed.every((set) => set.durationSeconds >= exercise.targetDurationSeconds);
     const ready = currentMet || (!completed.length && Boolean(previous?.targetMet));
     const step = exercise.targetDurationSeconds >= 60 ? 10 : 5;

@@ -142,13 +142,19 @@ function StrengthLevelDetail({ level }: { level: NonNullable<ReturnType<typeof s
   const levelNames = level.levelNames ?? STRENGTH_LEVELS.map((tier) => tier.name);
   const selectedTier = { ...STRENGTH_LEVELS[selectedIndex - 1], name: levelNames[selectedIndex - 1] };
   const selectedRange = level.ranges[selectedIndex - 1] ?? { min: level.rangeMin, max: level.rangeMax };
+  const selectedMilestone = level.milestones?.[selectedIndex - 1];
+  const formatWeightedHold = (weight: number, seconds: number) => `${weight ? `+${weight} kg added` : 'Bodyweight'} · ${seconds} sec`;
   const formatMetric = (value: number) => level.metric === 'assistanceEquivalent'
     ? value < 0 ? `${Math.abs(value)} kg assistance` : value === 0 ? 'Bodyweight' : `+${value} kg added`
     : level.isAddedWeight ? value === 0 ? 'Bodyweight' : `+${value} kg added`
     : `${value} ${level.unit}`;
   const loadSuffix = level.metric === 'weight' && !level.isAddedWeight ? level.isAssistance ? ' assistance' : level.loadMode === 'perSide' ? ' per side' : ' total' : '';
-  const load = `${formatMetric(level.load)}${loadSuffix}`;
-  const range = selectedRange.max === null
+  const load = level.metric === 'weightedHold'
+    ? formatWeightedHold(level.bestWeight ?? 0, level.bestSeconds ?? 0)
+    : `${formatMetric(level.load)}${loadSuffix}`;
+  const range = selectedMilestone
+    ? formatWeightedHold(selectedMilestone.weight, selectedMilestone.seconds)
+    : selectedRange.max === null
     ? level.isAddedWeight ? `${formatMetric(selectedRange.min)} or more` : `${formatMetric(selectedRange.min)}+`
     : level.isAssistance && level.metric === 'weight'
       ? `${formatMetric(selectedRange.min)}–${formatMetric(selectedRange.max)} assistance`
@@ -159,7 +165,7 @@ function StrengthLevelDetail({ level }: { level: NonNullable<ReturnType<typeof s
       <div className="level-title"><h4>{selectedTier.name}</h4><span style={{ background: selectedTier.color }}>{selectedIndex}</span></div>
       <div className="level-metrics">
         <div><span>{level.hasHistory ? 'BEST LOGGED' : 'PLAN LOAD'}</span><strong>{load}</strong></div>
-        <div><span>LEVEL {selectedIndex} RANGE</span><strong>{range}</strong></div>
+        <div><span>LEVEL {selectedIndex} {selectedMilestone ? 'REQUIREMENT' : 'RANGE'}</span><strong>{range}</strong></div>
       </div>
       {selectedIndex !== level.index && <div className="level-current-note">CURRENT LEVEL · <strong>L{level.index} {level.name}</strong></div>}
       <div className="level-scale-heading"><span>EXPLORE LEVELS</span><small>Tap a level to view its range</small></div>
@@ -172,7 +178,7 @@ function StrengthLevelDetail({ level }: { level: NonNullable<ReturnType<typeof s
         })}
       </div>
       <div className="level-scale-labels"><span><b>L1</b> {levelNames[0]}</span><span><b>L6</b> {levelNames[5]}</span><span><b>L10</b> {levelNames[9]}</span></div>
-      <p>{level.metric === 'assistanceEquivalent' ? 'Assistance is converted to an equivalent load: machine assistance is negative, while added external weight is positive.' : level.isAddedWeight ? 'Levels use only the external weight held at your chest; bodyweight is Level 1. Your best logged added load sets the level.' : level.isAssistance && level.metric === 'weight' ? 'Lower machine assistance is stronger. Your lowest logged assistance sets this level.' : level.metric === 'reps' ? 'Your best completed repetitions set this level.' : level.metric === 'seconds' ? 'Your best completed hold duration sets this level.' : level.loadMode === 'perSide' ? 'This exercise is measured per side. Personal targets do not change its level bands.' : 'Your best logged load sets the level. Personal targets are tracked separately and do not change the level bands.'}</p>
+      <p>{level.metric === 'weightedHold' ? 'Each level requires both the shown added weight and hold time. Your best completed set determines the current level.' : level.metric === 'assistanceEquivalent' ? 'Assistance is converted to an equivalent load: machine assistance is negative, while added external weight is positive.' : level.isAddedWeight ? 'Levels use only the external weight held at your chest; bodyweight is Level 1. Your best logged added load sets the level.' : level.isAssistance && level.metric === 'weight' ? 'Lower machine assistance is stronger. Your lowest logged assistance sets this level.' : level.metric === 'reps' ? 'Your best completed repetitions set this level.' : level.metric === 'seconds' ? 'Your best completed hold duration sets this level.' : level.loadMode === 'perSide' ? 'This exercise is measured per side. Personal targets do not change its level bands.' : 'Your best logged load sets the level. Personal targets are tracked separately and do not change the level bands.'}</p>
     </div>
   );
 }

@@ -16,6 +16,17 @@ describe('workout data identity and scoped updates', () => {
     expect(normalizeWorkoutData(data).dayPlans[0].exercises[0].id).toBe('exercise-shared-press');
   });
 
+  it('preserves the paired weight and hold-time Plank level standard', () => {
+    const data = createDefaultWorkoutData();
+    data.dayPlans[0].exercises[0].levelStandard = {
+      thresholds: [0, 0, 0, 0, 5, 10, 15, 25, 35, 40],
+      holdSeconds: [20, 30, 45, 60, 30, 45, 60, 60, 60, 60],
+      metric: 'weightedHold', unit: 'level',
+    };
+    expect(normalizeWorkoutData(data).dayPlans[0].exercises[0].levelStandard?.holdSeconds)
+      .toEqual([20, 30, 45, 60, 30, 45, 60, 60, 60, 60]);
+  });
+
   it('sends and applies only the requested data scope', () => {
     const current = createDefaultWorkoutData();
     const changed = { ...current, activeWorkout: { date: '2026-09-25', planDay: 4, startedAt: '2026-09-25T00:00:00.000Z', name: 'Test', focus: '', exercises: [], retake: false, restTimer: null } };

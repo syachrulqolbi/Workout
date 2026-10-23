@@ -8,6 +8,13 @@ const pullUpStandard = {
   unit: 'kg' as const,
 };
 
+const plankStandard = {
+  thresholds: [0, 0, 0, 0, 5, 10, 15, 25, 35, 40],
+  holdSeconds: [20, 30, 45, 60, 30, 45, 60, 60, 60, 60],
+  metric: 'weightedHold' as const,
+  unit: 'level' as const,
+};
+
 function exercise(overrides: Partial<LibraryExercise> = {}): LibraryExercise {
   return {
     id: 'exercise-pull-up', name: 'Pull Up', type: 'strength', measurement: 'reps',
@@ -53,6 +60,24 @@ describe('strength levels', () => {
     expect(level?.levelNames).toEqual(CUSTOM_TRAINING_LEVEL_NAMES);
     expect(level?.isAddedWeight).toBe(true);
     expect(level?.load).toBe(20);
+  });
+
+  it('requires both added weight and time for each Plank milestone', () => {
+    const plank = exercise({
+      id: 'exercise-plank', name: 'Plank', measurement: 'duration', loadMode: 'duration',
+      weight: 0, reps: 0, durationSeconds: 20, sets: 2, levelStandard: plankStandard,
+    });
+    const plankRecord = (weight: number, seconds: number): ExerciseRecord => ({
+      ...pullUpRecord('duration', weight), exerciseId: 'exercise-plank', exercise: 'Plank',
+      measurement: 'duration', weight, reps: 0, durationSeconds: seconds, setsCompleted: 1,
+      completedSets: [{ weight, reps: 0, durationSeconds: seconds, durationMinutes: 0, distanceKm: 0, calories: 0 }],
+    });
+    expect(strengthLevelForExercise(plank, [])?.name).toBe('Novice');
+    expect(strengthLevelForExercise(plank, [plankRecord(0, 60)])?.name).toBe('Developing');
+    expect(strengthLevelForExercise(plank, [plankRecord(5, 30)])?.name).toBe('Intermediate');
+    expect(strengthLevelForExercise(plank, [plankRecord(10, 45)])?.name).toBe('Proficient');
+    expect(strengthLevelForExercise(plank, [plankRecord(40, 20)])?.index).toBe(1);
+    expect(strengthLevelForExercise(plank, [plankRecord(40, 60)])?.name).toBe('Elite');
   });
 
   it('uses the next explicit tier at an exact threshold', () => {

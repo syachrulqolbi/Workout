@@ -31,7 +31,12 @@ const levelStandards = new Map([
   ['exercise-hip-abductor', [34, 46.5, 59, 75.5, 92, 112, 132, 147.5, 162.5, 178]],
   ['exercise-hip-adductor', [38, 51, 64, 81.5, 99, 120.5, 142, 158, 174, 190]],
   ['exercise-calf-raise', [43, 62.5, 82, 109.5, 137, 171, 205, 231.5, 257.5, 284]],
-  ['exercise-plank', { thresholds: [11, 24.5, 38, 56.5, 75, 96.5, 118, 134, 150, 166], metric: 'seconds', unit: 'sec' }],
+  ['exercise-plank', {
+    thresholds: [0, 0, 0, 0, 5, 10, 15, 25, 35, 40],
+    holdSeconds: [20, 30, 45, 60, 30, 45, 60, 60, 60, 60],
+    metric: 'weightedHold',
+    unit: 'level',
+  }],
   ['exercise-iso-lateral-super-incline-press', [43, 53, 63, 74.5, 86, 100, 114, 124, 134, 144]],
   ['exercise-close-grip-seated-row', [41, 50.5, 60, 72, 84, 98, 112, 122, 132, 142]],
   ['exercise-rear-delt-fly', [25, 33.5, 42, 53, 64, 77, 90, 100, 110, 120]],
@@ -54,18 +59,19 @@ function strength({ name, category, priority = false, weight, reps, sets, restSe
   const timed = /\b(plank|hold|wall sit)\b/i.test(name);
   const standard = levelStandard(name);
   const assistance = (standard?.metric === 'assistanceEquivalent' && weight > 0) || /assist/i.test(name);
+  const weightedHold = standard?.metric === 'weightedHold';
   const levelOneUpperValue = standard
     ? levelUpperLimit(standard.thresholds, 1, standard.metric === 'weight' ? 0.5 : 1)
     : undefined;
   const levelMetric = standard?.metric;
-  const resetWeight = !assistance && levelMetric === 'weight' ? levelOneUpperValue : weight;
+  const resetWeight = weightedHold ? standard.thresholds[0] : !assistance && levelMetric === 'weight' ? levelOneUpperValue : weight;
   const resetReps = levelMetric === 'reps' ? levelOneUpperValue : reps;
-  const resetSeconds = levelMetric === 'seconds' ? levelOneUpperValue : reps;
+  const resetSeconds = weightedHold ? standard.holdSeconds[0] : levelMetric === 'seconds' ? levelOneUpperValue : reps;
   const loadMode = timed ? 'duration' : assistance ? 'assistance' : resetWeight > 0 ? 'total' : 'bodyweight';
   return {
     id: stableExerciseId(name), name, type: 'strength', measurement: timed ? 'duration' : 'reps',
     loadMode,
-    weight: timed ? 0 : resetWeight, reps: timed ? 0 : resetReps, sets, durationSeconds: timed ? resetSeconds : 0,
+    weight: timed && !weightedHold ? 0 : resetWeight, reps: timed ? 0 : resetReps, sets, durationSeconds: timed ? resetSeconds : 0,
     durationMinutes: 0, distanceKm: 0, calories: 0, restSeconds,
     category, priority, ...(standard !== undefined ? { levelStandard: standard } : {}),
   };
@@ -114,7 +120,7 @@ const dayPlans = [
       strength({ id: 'tue-hip-abductor', name: 'Hip abductor (A)', category: 'HIPS', prescription: '2×12–15', current: '50', target: '101.5', weight: 50, reps: 15, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
       strength({ id: 'tue-hip-adductor', name: 'Hip adductor (B)', category: 'HIPS', prescription: '2×12–15', current: '55', target: '111', weight: 55, reps: 15, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
       strength({ id: 'tue-calf-raise', name: 'Calf raise', category: 'CALVES', prescription: '2×12–15', current: '90', target: '145', weight: 90, reps: 15, sets: 2, restSeconds: 60, restLabel: '60 sec' }),
-      strength({ id: 'tue-plank', name: 'Plank', category: 'CORE', priority: true, prescription: '2×45 sec', current: '45 sec', target: '45 sec', weight: 0, reps: 45, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
+      strength({ name: 'Plank', category: 'CORE', priority: true, weight: 0, reps: 20, sets: 2, restSeconds: 60 }),
       cardio('tue-incline-walk'),
     ],
   },

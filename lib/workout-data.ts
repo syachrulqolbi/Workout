@@ -1,11 +1,12 @@
 export type ExerciseType = 'strength' | 'cardio';
 export type ExerciseMeasurement = 'reps' | 'duration' | 'distance';
 export type ExerciseLoadMode = 'total' | 'perSide' | 'assistance' | 'bodyweight' | 'duration';
-export type ExerciseLevelMetric = 'weight' | 'reps' | 'seconds' | 'assistanceEquivalent';
+export type ExerciseLevelMetric = 'weight' | 'reps' | 'seconds' | 'assistanceEquivalent' | 'weightedHold';
 export type ExerciseLevelStandard = {
   thresholds: number[];
   metric: ExerciseLevelMetric;
-  unit: 'kg' | 'reps' | 'sec';
+  unit: 'kg' | 'reps' | 'sec' | 'level';
+  holdSeconds?: number[];
 };
 
 export type CompletedSetRecord = {
@@ -328,6 +329,29 @@ function normalizeSet(value: unknown, fallbackId: string): SetEntry {
   };
 }
 
+function normalizeLevelStandard(value: unknown): ExerciseLevelStandard | undefined {
+  const standard = record(value);
+  const thresholds = Array.isArray(standard.thresholds)
+    ? standard.thresholds.map(Number).filter(Number.isFinite)
+    : [];
+  const holdSeconds = Array.isArray(standard.holdSeconds)
+    ? standard.holdSeconds.map(Number).filter(Number.isFinite)
+    : [];
+  const metric = standard.metric;
+  const unit = standard.unit;
+  const validMetric = metric === 'weight' || metric === 'reps' || metric === 'seconds'
+    || metric === 'assistanceEquivalent' || metric === 'weightedHold';
+  const validUnit = unit === 'kg' || unit === 'reps' || unit === 'sec' || unit === 'level';
+  if (thresholds.length !== 10 || !validMetric || !validUnit) return undefined;
+  if (metric === 'weightedHold' && holdSeconds.length !== 10) return undefined;
+  return {
+    thresholds,
+    metric,
+    unit,
+    ...(metric === 'weightedHold' ? { holdSeconds } : {}),
+  } as ExerciseLevelStandard;
+}
+
 function normalizeLibraryExercise(value: unknown, fallbackId: string): LibraryExercise {
   const item = record(value);
   const type = exerciseType(item.type);
@@ -338,17 +362,7 @@ function normalizeLibraryExercise(value: unknown, fallbackId: string): LibraryEx
   const durationSeconds = nonNegative(item.durationSeconds, legacyTimedSeconds, 86_400);
   const weight = nonNegative(item.weight);
   const sets = Math.min(100, Math.max(1, Math.round(number(item.sets, type === 'strength' ? 3 : 1))));
-  const rawLevelStandard = record(item.levelStandard);
-  const levelThresholds = Array.isArray(rawLevelStandard.thresholds)
-    ? rawLevelStandard.thresholds.map((threshold) => Number(threshold)).filter(Number.isFinite)
-    : [];
-  const levelMetric = rawLevelStandard.metric;
-  const levelUnit = rawLevelStandard.unit;
-  const levelStandard = item.levelStandard === null ? null : levelThresholds.length === 10
-    && (levelMetric === 'weight' || levelMetric === 'reps' || levelMetric === 'seconds' || levelMetric === 'assistanceEquivalent')
-    && (levelUnit === 'kg' || levelUnit === 'reps' || levelUnit === 'sec')
-    ? { thresholds: levelThresholds, metric: levelMetric, unit: levelUnit } as ExerciseLevelStandard
-    : undefined;
+  const levelStandard = item.levelStandard === null ? null : normalizeLevelStandard(item.levelStandard);
   return {
     id: storedExerciseId(item.id ?? fallbackId, name), name, type, measurement,
     loadMode: exerciseLoadMode(item.loadMode, type, measurement, name, weight),
@@ -486,11 +500,7 @@ export function normalizeWorkoutData(value: unknown): WorkoutData {
         targetDistanceKm: distanceKm,
         restSeconds: type === 'cardio' && sets.length <= 1 ? 0 : nonNegative(item.restSeconds, type === 'strength' ? 90 : 0, 3_600),
         category: String(item.category ?? ''),
-        levelStandard: item.levelStandard === null ? null : (() => {
-          const standard = record(item.levelStandard);
-          const thresholds = Array.isArray(standard.thresholds) ? standard.thresholds.map(Number).filter(Number.isFinite) : [];
-          return thresholds.length === 10 ? { thresholds, metric: standard.metric as ExerciseLevelMetric, unit: standard.unit as ExerciseLevelStandard['unit'] } : undefined;
-        })(),
+        levelStandard: item.levelStandard === null ? null : normalizeLevelStandard(item.levelStandard),
         sets: sets.map((set, setIndex) => {
           const normalized = normalizeSet(set, `active-${exerciseIndex}-${setIndex}`);
           return type === 'strength' && measurement === 'duration' && !normalized.durationSeconds
