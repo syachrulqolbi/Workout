@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CUSTOM_TRAINING_LEVEL_NAMES, PULL_UP_LEVEL_NAMES, strengthLevelForActiveExercise, strengthLevelForExercise, strengthLevelForWorkoutExercise } from '../lib/exercise-profile';
+import { STRENGTH_LEVELS, strengthLevelForActiveExercise, strengthLevelForExercise, strengthLevelForWorkoutExercise } from '../lib/exercise-profile';
 import type { ExerciseEntry, ExerciseRecord, LibraryExercise } from '../lib/workout-data';
 
 const pullUpStandard = {
@@ -33,18 +33,17 @@ function pullUpRecord(loadMode: ExerciseRecord['loadMode'], weight: number): Exe
 }
 
 describe('strength levels', () => {
-  it('uses the custom Pull Up progression for the planned assistance', () => {
+  it('uses the Pull Up progression with the shared level names', () => {
     const level = strengthLevelForExercise(exercise(), []);
     expect(level?.index).toBe(3);
-    expect(level?.name).toBe('Elementary');
-    expect(level?.levelNames).toEqual(PULL_UP_LEVEL_NAMES);
+    expect(level?.name).toBe('Novice');
     expect(level?.load).toBe(-28.5);
     expect(level?.loadMode).toBe('assistance');
   });
 
   it('continues one Pull Up scale through bodyweight and weighted records', () => {
-    expect(strengthLevelForExercise(exercise(), [pullUpRecord('bodyweight', 0)])?.name).toBe('Proficient');
-    expect(strengthLevelForExercise(exercise(), [pullUpRecord('total', 20)])?.name).toBe('Expert');
+    expect(strengthLevelForExercise(exercise(), [pullUpRecord('bodyweight', 0)])?.name).toBe('Intermediate+');
+    expect(strengthLevelForExercise(exercise(), [pullUpRecord('total', 20)])?.name).toBe('Elite−');
     expect(strengthLevelForExercise(exercise(), [pullUpRecord('total', 35)])?.name).toBe('Elite');
   });
 
@@ -57,7 +56,6 @@ describe('strength levels', () => {
     const level = strengthLevelForExercise(backExtension, []);
     expect(level?.index).toBe(5);
     expect(level?.name).toBe('Intermediate');
-    expect(level?.levelNames).toEqual(CUSTOM_TRAINING_LEVEL_NAMES);
     expect(level?.isAddedWeight).toBe(true);
     expect(level?.load).toBe(20);
   });
@@ -72,12 +70,23 @@ describe('strength levels', () => {
       measurement: 'duration', weight, reps: 0, durationSeconds: seconds, setsCompleted: 1,
       completedSets: [{ weight, reps: 0, durationSeconds: seconds, durationMinutes: 0, distanceKm: 0, calories: 0 }],
     });
-    expect(strengthLevelForExercise(plank, [])?.name).toBe('Novice');
-    expect(strengthLevelForExercise(plank, [plankRecord(0, 60)])?.name).toBe('Developing');
+    expect(strengthLevelForExercise(plank, [])?.name).toBe('Beginner');
+    expect(strengthLevelForExercise(plank, [plankRecord(0, 60)])?.name).toBe('Novice+');
     expect(strengthLevelForExercise(plank, [plankRecord(5, 30)])?.name).toBe('Intermediate');
-    expect(strengthLevelForExercise(plank, [plankRecord(10, 45)])?.name).toBe('Proficient');
+    expect(strengthLevelForExercise(plank, [plankRecord(10, 45)])?.name).toBe('Intermediate+');
     expect(strengthLevelForExercise(plank, [plankRecord(40, 20)])?.index).toBe(1);
     expect(strengthLevelForExercise(plank, [plankRecord(40, 60)])?.name).toBe('Elite');
+  });
+
+  it('uses one shared name for every level index across custom progressions', () => {
+    const backExtension = exercise({
+      id: 'exercise-loaded-back-extension', name: 'Loaded back extension (B)', loadMode: 'total', weight: 15,
+      levelStandard: { thresholds: [0, 5, 10, 15, 20, 25, 30, 35, 40, 50], metric: 'weight', unit: 'kg' },
+    });
+    const pullUp = strengthLevelForExercise(exercise(), []);
+    const extension = strengthLevelForExercise(backExtension, []);
+    expect(pullUp?.name).toBe(STRENGTH_LEVELS[(pullUp?.index ?? 1) - 1].name);
+    expect(extension?.name).toBe(STRENGTH_LEVELS[(extension?.index ?? 1) - 1].name);
   });
 
   it('uses the next explicit tier at an exact threshold', () => {

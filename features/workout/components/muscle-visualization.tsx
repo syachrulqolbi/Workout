@@ -139,7 +139,7 @@ function PlanSummaryDetail({ exercises, muscles, averageLevel, gradedExerciseCou
 
 function StrengthLevelDetail({ level }: { level: NonNullable<ReturnType<typeof strengthLevelForExercise>> }) {
   const [selectedIndex, setSelectedIndex] = useState(level.index);
-  const levelNames = level.levelNames ?? STRENGTH_LEVELS.map((tier) => tier.name);
+  const levelNames = STRENGTH_LEVELS.map((tier) => tier.name);
   const selectedTier = { ...STRENGTH_LEVELS[selectedIndex - 1], name: levelNames[selectedIndex - 1] };
   const selectedRange = level.ranges[selectedIndex - 1] ?? { min: level.rangeMin, max: level.rangeMax };
   const selectedMilestone = level.milestones?.[selectedIndex - 1];
