@@ -11,6 +11,7 @@ const details = process.argv.includes('--details');
 const resetLevels = process.argv.includes('--reset-levels');
 
 const levelStandards = new Map([
+  ['exercise-pull-up', { thresholds: [-50, -40, -30, -20, -10, 0, 5, 10, 20, 35], metric: 'assistanceEquivalent', unit: 'kg' }],
   ['exercise-iso-lateral-bench-press', [34, 45, 56, 71, 86, 103.5, 121, 134.5, 147.5, 161]],
   ['exercise-iso-lateral-wide-pulldown', [42, 51, 60, 71, 82, 94.5, 107, 116, 125, 134]],
   ['exercise-iso-lateral-shoulder-press', [25, 35, 45, 59, 73, 90.5, 108, 121.5, 134.5, 148]],
@@ -44,7 +45,6 @@ const levelStandards = new Map([
 ]);
 
 function levelStandard(name) {
-  if (stableExerciseId(name) === 'exercise-assisted-pull-up') return undefined;
   const standard = levelStandards.get(stableExerciseId(name));
   if (!standard) return null;
   return Array.isArray(standard) ? { thresholds: standard, metric: 'weight', unit: 'kg' } : standard;
@@ -53,7 +53,7 @@ function levelStandard(name) {
 function strength({ name, category, priority = false, weight, reps, sets, restSeconds }) {
   const timed = /\b(plank|hold|wall sit)\b/i.test(name);
   const standard = levelStandard(name);
-  const assistance = /assist/i.test(name);
+  const assistance = (standard?.metric === 'assistanceEquivalent' && weight > 0) || /assist/i.test(name);
   const levelOneUpperValue = standard
     ? levelUpperLimit(standard.thresholds, 1, standard.metric === 'weight' ? 0.5 : 1)
     : undefined;
@@ -142,7 +142,7 @@ const dayPlans = [
     focus: 'Back, chest, shoulders, traps, posture, core',
     estimatedTime: '65–85 min',
     exercises: [
-      strength({ id: 'fri-assisted-pull-up', name: 'Assisted pull-up', category: 'PULL', priority: true, prescription: '3×6–8', current: '28.5 assistance', target: '0 assistance / 34 reps over time', weight: 28.5, reps: 8, sets: 3, restSeconds: 90, restLabel: '90 sec' }),
+      strength({ name: 'Pull Up', category: 'PULL', priority: true, weight: 28.5, reps: 8, sets: 3, restSeconds: 90 }),
       strength({ id: 'fri-high-row', name: 'Iso lateral high row (A)', category: 'PULL', priority: true, prescription: '3×6–8', current: '75 total', target: '178 total', weight: 75, reps: 8, sets: 3, restSeconds: 90, restLabel: '90 sec' }),
       strength({ id: 'fri-low-row', name: 'Iso lateral low row (B)', category: 'PULL', priority: true, prescription: '3×6–8', current: '70 total', target: '137 total', weight: 70, reps: 8, sets: 3, restSeconds: 90, restLabel: '90 sec' }),
       strength({ id: 'fri-cable-chest-fly', name: 'Hi-lo cable chest fly', category: 'PUSH', prescription: '2×12–15', current: '30 total', target: '97 total', weight: 30, reps: 15, sets: 2, restSeconds: 60, restLabel: '60 sec' }),
@@ -166,6 +166,7 @@ function historyKey(name) {
 
 function migratedExerciseName(name) {
   const key = historyKey(name);
+  if (key === 'assisted pull up' || key === 'weighted pull up' || key === 'pullup' || key === 'pull up') return 'Pull Up';
   if (key === 'cable curl') return null;
   if (key === 'bicep curl') return 'Bicep curl';
   if (key === 'cable crunch' || key === 'cable woodchopper') return 'Cable Woodchopper';

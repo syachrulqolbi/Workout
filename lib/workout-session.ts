@@ -25,10 +25,11 @@ export function buildWorkout(
     exercises: plan.exercises.map((exercise) => {
       const exerciseId = exercise.id || stableExerciseId(exercise.name);
       const latest = latestExerciseRecord(latestByExercise, { id: exerciseId, name: exercise.name });
-      const latestSetWeights = latest?.completedSets.map((set) => Number(set.weight)).filter(Number.isFinite) ?? [];
+      const compatibleLatest = latest?.loadMode === exercise.loadMode ? latest : undefined;
+      const latestSetWeights = compatibleLatest?.completedSets.map((set) => Number(set.weight)).filter(Number.isFinite) ?? [];
       const latestWeight = exercise.loadMode === 'assistance' && latestSetWeights.length
         ? Math.min(...latestSetWeights)
-        : Number(latest?.weight);
+        : Number(compatibleLatest?.weight);
       const useLatestWeight = exercise.type === 'strength' && exercise.measurement === 'reps'
         && exercise.loadMode !== 'bodyweight' && Number.isFinite(latestWeight)
         && (exercise.loadMode === 'assistance' ? latestWeight >= 0 : latestWeight > 0);

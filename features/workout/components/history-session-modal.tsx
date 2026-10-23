@@ -3,6 +3,7 @@
 import { Save, X } from 'lucide-react';
 import { FormEvent } from 'react';
 import { useDialogAccessibility } from '@/features/workout/hooks/use-dialog-accessibility';
+import { canonicalExerciseName } from '@/lib/exercise-profile';
 import type { ExerciseRecord, WorkoutSession } from '@/lib/workout-data';
 
 function localDateTimeValue(value: string) {
@@ -118,7 +119,7 @@ export function HistorySessionModal({ workout, records, close, save }: {
               <fieldset className="history-record-card" key={record.id}>
                 <legend>
                   <span>{String(index + 1).padStart(2, '0')}</span>
-                  {record.exercise}
+                  {canonicalExerciseName(record.exercise)}
                 </legend>
                 <div className={`history-record-fields ${record.type === 'cardio' ? 'cardio' : ''}`}>
                   {record.type === 'strength' && record.measurement === 'reps' && (

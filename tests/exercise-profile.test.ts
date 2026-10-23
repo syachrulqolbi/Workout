@@ -1,20 +1,44 @@
 import { describe, expect, it } from 'vitest';
-import { strengthLevelForActiveExercise, strengthLevelForExercise, strengthLevelForWorkoutExercise } from '../lib/exercise-profile';
-import type { ExerciseEntry, LibraryExercise } from '../lib/workout-data';
+import { PULL_UP_LEVEL_NAMES, strengthLevelForActiveExercise, strengthLevelForExercise, strengthLevelForWorkoutExercise } from '../lib/exercise-profile';
+import type { ExerciseEntry, ExerciseRecord, LibraryExercise } from '../lib/workout-data';
+
+const pullUpStandard = {
+  thresholds: [-50, -40, -30, -20, -10, 0, 5, 10, 20, 35],
+  metric: 'assistanceEquivalent' as const,
+  unit: 'kg' as const,
+};
 
 function exercise(overrides: Partial<LibraryExercise> = {}): LibraryExercise {
   return {
-    id: 'exercise-assisted-pull-up', name: 'Assisted pull-up', type: 'strength', measurement: 'reps',
+    id: 'exercise-pull-up', name: 'Pull Up', type: 'strength', measurement: 'reps',
     loadMode: 'assistance', weight: 28.5, reps: 8, sets: 3, durationSeconds: 0, durationMinutes: 0,
-    distanceKm: 0, calories: 0, restSeconds: 90, ...overrides,
+    distanceKm: 0, calories: 0, restSeconds: 90, levelStandard: pullUpStandard, ...overrides,
+  };
+}
+
+function pullUpRecord(loadMode: ExerciseRecord['loadMode'], weight: number): ExerciseRecord {
+  return {
+    id: `record-${loadMode}-${weight}`, sessionId: 'session-1', exerciseId: 'exercise-assisted-pull-up', exercise: 'Assisted pull-up',
+    date: '2026-09-20T00:00:00.000Z', type: 'strength', measurement: 'reps', loadMode,
+    weight, reps: 8, setsCompleted: 3, targetMet: true, durationSeconds: 0, durationMinutes: 0,
+    distanceKm: 0, calories: 0, completedSets: [], estimated: false,
   };
 }
 
 describe('strength levels', () => {
-  it('treats planned assisted-pull-up assistance as Level 4', () => {
+  it('uses the custom Pull Up progression for the planned assistance', () => {
     const level = strengthLevelForExercise(exercise(), []);
-    expect(level?.index).toBe(4);
+    expect(level?.index).toBe(3);
+    expect(level?.name).toBe('Elementary');
+    expect(level?.levelNames).toEqual(PULL_UP_LEVEL_NAMES);
+    expect(level?.load).toBe(-28.5);
     expect(level?.loadMode).toBe('assistance');
+  });
+
+  it('continues one Pull Up scale through bodyweight and weighted records', () => {
+    expect(strengthLevelForExercise(exercise(), [pullUpRecord('bodyweight', 0)])?.name).toBe('Proficient');
+    expect(strengthLevelForExercise(exercise(), [pullUpRecord('total', 20)])?.name).toBe('Expert');
+    expect(strengthLevelForExercise(exercise(), [pullUpRecord('total', 35)])?.name).toBe('Elite');
   });
 
   it('uses the next explicit tier at an exact threshold', () => {
@@ -27,9 +51,9 @@ describe('strength levels', () => {
 
   it('uses the same resolver for an active assisted exercise', () => {
     const active: ExerciseEntry = {
-      id: 'exercise-assisted-pull-up', name: 'Assisted pull-up', type: 'strength', measurement: 'reps',
+      id: 'exercise-pull-up', name: 'Pull Up', type: 'strength', measurement: 'reps',
       loadMode: 'assistance', targetWeight: 28.5, targetReps: 8, targetDurationSeconds: 0,
-      targetDurationMinutes: 0, targetDistanceKm: 0, restSeconds: 90,
+      targetDurationMinutes: 0, targetDistanceKm: 0, restSeconds: 90, levelStandard: pullUpStandard,
       sets: [{ id: 'set-1', weight: 28.5, reps: 8, durationSeconds: 0, durationMinutes: 0, distanceKm: 0, calories: 0, done: false }],
     };
     expect(strengthLevelForActiveExercise(active)?.index).toBe(strengthLevelForExercise(exercise(), [])?.index);

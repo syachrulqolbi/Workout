@@ -21,4 +21,11 @@ describe('workout level thresholds', () => {
     expect(stableExerciseId('Shrugs (A)')).toBe('exercise-shrugs');
     expect(stableExerciseId('Cable shrugs (B)')).toBe('exercise-shrugs');
   });
+
+  it('uses one stable identity for assisted, bodyweight and weighted Pull Up names', () => {
+    expect(stableExerciseId('Pull Up')).toBe('exercise-pull-up');
+    expect(stableExerciseId('Assisted pull-up')).toBe('exercise-pull-up');
+    expect(stableExerciseId('Weighted Pull-Up')).toBe('exercise-pull-up');
+    expect(stableExerciseId('Pullup')).toBe('exercise-pull-up');
+  });
 });

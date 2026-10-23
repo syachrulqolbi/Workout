@@ -38,6 +38,13 @@ describe('buildWorkout', () => {
     expect(workout.exercises[0].targetWeight).toBe(44.5);
   });
 
+  it('does not reinterpret assistance as added weight when a movement changes load mode', () => {
+    const workout = buildWorkout(plan, false, [{ ...record(20), loadMode: 'assistance' }], {
+      now: new Date('2026-09-27T01:00:00.000Z'), createId: () => 'set-id',
+    });
+    expect(workout.exercises[0].targetWeight).toBe(44.5);
+  });
+
   it('does not carry a pre-reset strength load into the next workout', () => {
     const workout = buildWorkout(plan, false, [record(70)], {
       now: new Date('2026-10-02T01:00:00.000Z'), createId: () => 'set-id',

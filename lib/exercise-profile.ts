@@ -28,6 +28,11 @@ export const STRENGTH_LEVELS = [
   { name: 'Elite', color: '#111111' },
 ] as const;
 
+export const PULL_UP_LEVEL_NAMES = [
+  'Novice', 'Beginner', 'Elementary', 'Developing', 'Intermediate',
+  'Proficient', 'Strong', 'Advanced', 'Expert', 'Elite',
+] as const;
+
 const PLAN_BASELINE_LEVEL = 4;
 const MAX_STRENGTH_LEVEL = STRENGTH_LEVELS.length;
 
@@ -77,6 +82,10 @@ function normalizedName(name: string) {
 }
 
 const EXERCISE_NAME_ALIASES: Record<string, string> = {
+  'assisted pull up': 'Pull Up',
+  'weighted pull up': 'Pull Up',
+  'pullup': 'Pull Up',
+  'pull up': 'Pull Up',
   'single arm iso lateral bench press': 'Iso lateral bench press',
   'single arm iso lateral wide pulldown': 'Iso lateral wide pulldown',
   'single arm iso lateral shoulder press': 'Iso lateral shoulder press',
@@ -131,6 +140,7 @@ export type StrengthLevel = {
   metric: 'weight' | 'reps' | 'seconds' | 'assistanceEquivalent';
   unit: 'kg' | 'reps' | 'sec';
   ranges: Array<{ min: number; max: number | null }>;
+  levelNames?: readonly string[];
 };
 
 function explicitLevelRanges(thresholds: number[]) {
@@ -247,6 +257,9 @@ export function strengthLevelForExercise(exercise: LibraryExercise, history: Exe
   if (exercise.levelStandard) {
     const { thresholds, metric, unit } = exercise.levelStandard;
     const ranges = explicitLevelRanges(thresholds);
+    const pullUpProgression = stableExerciseId(canonicalExerciseName(exercise.name)) === 'exercise-pull-up'
+      && metric === 'assistanceEquivalent';
+    const levelNames = pullUpProgression ? PULL_UP_LEVEL_NAMES : undefined;
     const historyValues = matches.flatMap((record) => {
       if (metric === 'weight') return [record.weight];
       if (metric === 'assistanceEquivalent') return [record.loadMode === 'assistance' ? -record.weight : record.weight];
@@ -264,9 +277,9 @@ export function strengthLevelForExercise(exercise: LibraryExercise, history: Exe
     const load = Math.max(plannedValue, ...historyValues);
     const index = levelIndexForThresholds(thresholds, load);
     return {
-      index, ...STRENGTH_LEVELS[index - 1], load: rounded(load),
+      index, ...STRENGTH_LEVELS[index - 1], name: levelNames?.[index - 1] ?? STRENGTH_LEVELS[index - 1].name, load: rounded(load),
       rangeMin: thresholds[index - 1], rangeMax: thresholds[Math.min(index, thresholds.length - 1)],
-      isAssistance, hasHistory: historyValues.length > 0, loadMode: exercise.loadMode, metric, unit, ranges,
+      isAssistance, hasHistory: historyValues.length > 0, loadMode: exercise.loadMode, metric, unit, ranges, levelNames,
     };
   }
 

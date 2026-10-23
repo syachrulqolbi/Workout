@@ -214,7 +214,9 @@ export function WorkoutModal({
 function ExerciseMetrics({ exercise }: { exercise: ExerciseEntry }) {
   const load = exercise.type === 'cardio' ? `${exercise.targetDurationMinutes} min`
     : exercise.measurement === 'duration' ? `${exercise.targetDurationSeconds} sec`
-    : exercise.loadMode === 'bodyweight' ? 'Bodyweight' : `${exercise.targetWeight} kg`;
+    : exercise.loadMode === 'bodyweight' ? 'Bodyweight'
+    : exercise.loadMode === 'assistance' ? `${exercise.targetWeight} kg assist`
+    : `${exercise.targetWeight} kg`;
   const effort = exercise.type === 'cardio' ? 'Cardio'
     : exercise.measurement === 'duration' ? 'Timed' : `${exercise.targetReps} reps`;
   return <div className="workout-card-metrics"><div><strong>{load}</strong><span>LOAD</span></div><div><strong>{exercise.sets.length}</strong><span>SETS</span></div><div><strong>{effort}</strong><span>{exercise.measurement === 'duration' ? 'MODE' : 'REPS'}</span></div><div><strong>{exercise.restSeconds ? `${exercise.restSeconds} sec` : '—'}</strong><span>REST</span></div></div>;
@@ -247,7 +249,7 @@ type SetTableProps = {
 function StrengthSetTable({ exercise, updateSet, deleteSet, toggleDone }: SetTableProps) {
   return (
     <div className="set-table">
-      <div className="set-head"><span>SET</span><span>KG</span><span>REPS</span><span>DONE</span><span /></div>
+      <div className="set-head"><span>SET</span><span>{exercise.loadMode === 'assistance' ? 'ASSIST KG' : 'KG'}</span><span>REPS</span><span>DONE</span><span /></div>
       {exercise.sets.map((set, index) => (
         <div className={`set-row ${set.done ? 'completed' : ''}`} key={set.id}>
           <strong>{index + 1}</strong>

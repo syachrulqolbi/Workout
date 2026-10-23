@@ -139,10 +139,11 @@ function PlanSummaryDetail({ exercises, muscles, averageLevel, gradedExerciseCou
 
 function StrengthLevelDetail({ level }: { level: NonNullable<ReturnType<typeof strengthLevelForExercise>> }) {
   const [selectedIndex, setSelectedIndex] = useState(level.index);
-  const selectedTier = STRENGTH_LEVELS[selectedIndex - 1];
+  const levelNames = level.levelNames ?? STRENGTH_LEVELS.map((tier) => tier.name);
+  const selectedTier = { ...STRENGTH_LEVELS[selectedIndex - 1], name: levelNames[selectedIndex - 1] };
   const selectedRange = level.ranges[selectedIndex - 1] ?? { min: level.rangeMin, max: level.rangeMax };
   const formatMetric = (value: number) => level.metric === 'assistanceEquivalent'
-    ? `${value > 0 ? '+' : ''}${value} kg equivalent`
+    ? value < 0 ? `${Math.abs(value)} kg assistance` : value === 0 ? 'Bodyweight' : `+${value} kg added`
     : `${value} ${level.unit}`;
   const loadSuffix = level.metric === 'weight' ? level.isAssistance ? ' assistance' : level.loadMode === 'perSide' ? ' per side' : ' total' : '';
   const load = `${formatMetric(level.load)}${loadSuffix}`;
@@ -164,11 +165,12 @@ function StrengthLevelDetail({ level }: { level: NonNullable<ReturnType<typeof s
       <div className="level-scale" aria-label={`Current level ${level.index} of 10, ${level.name}. Choose a level to show its range.`}>
         {STRENGTH_LEVELS.map((tier, index) => {
           const tierIndex = index + 1;
+          const tierName = levelNames[index];
           const classes = [tierIndex <= level.index ? 'reached' : '', tierIndex === level.index ? 'achieved' : '', tierIndex === selectedIndex ? 'selected' : ''].filter(Boolean).join(' ');
-          return <button key={tier.name} type="button" className={classes} style={{ '--tier-color': tier.color } as CSSProperties} aria-label={`Show level ${tierIndex}, ${tier.name}, range${tierIndex === level.index ? ', current level' : ''}`} aria-pressed={tierIndex === selectedIndex} onClick={() => setSelectedIndex(tierIndex)}><span>{tierIndex}</span>{tierIndex === level.index && <i aria-hidden="true" />}</button>;
+          return <button key={`${tierIndex}-${tierName}`} type="button" className={classes} style={{ '--tier-color': tier.color } as CSSProperties} aria-label={`Show level ${tierIndex}, ${tierName}, range${tierIndex === level.index ? ', current level' : ''}`} aria-pressed={tierIndex === selectedIndex} onClick={() => setSelectedIndex(tierIndex)}><span>{tierIndex}</span>{tierIndex === level.index && <i aria-hidden="true" />}</button>;
         })}
       </div>
-      <div className="level-scale-labels"><span><b>L1</b> Beginner</span><span><b>L6</b> Intermediate+</span><span><b>L10</b> Elite</span></div>
+      <div className="level-scale-labels"><span><b>L1</b> {levelNames[0]}</span><span><b>L6</b> {levelNames[5]}</span><span><b>L10</b> {levelNames[9]}</span></div>
       <p>{level.metric === 'assistanceEquivalent' ? 'Assistance is converted to an equivalent load: machine assistance is negative, while added external weight is positive.' : level.isAssistance && level.metric === 'weight' ? 'Lower machine assistance is stronger. Your lowest logged assistance sets this level.' : level.metric === 'reps' ? 'Your best completed repetitions set this level.' : level.metric === 'seconds' ? 'Your best completed hold duration sets this level.' : level.loadMode === 'perSide' ? 'This exercise is measured per side. Personal targets do not change its level bands.' : 'Your best logged load sets the level. Personal targets are tracked separately and do not change the level bands.'}</p>
     </div>
   );
