@@ -3,7 +3,7 @@
 import { Save, X } from 'lucide-react';
 import { FormEvent } from 'react';
 import { useDialogAccessibility } from '@/features/workout/hooks/use-dialog-accessibility';
-import { canonicalExerciseName } from '@/lib/exercise-profile';
+import { canonicalExerciseName, isLoadedBackExtension } from '@/lib/exercise-profile';
 import type { ExerciseRecord, WorkoutSession } from '@/lib/workout-data';
 
 function localDateTimeValue(value: string) {
@@ -125,7 +125,7 @@ export function HistorySessionModal({ workout, records, close, save }: {
                   {record.type === 'strength' && record.measurement === 'reps' && (
                     <>
                       <label>
-                        <span>KG</span>
+                        <span>{isLoadedBackExtension({ id: record.exerciseId, name: record.exercise }) ? 'ADDED KG' : 'KG'}</span>
                         <input type="number" min="0" step="0.5" name={`record-${record.id}-weight`} defaultValue={record.weight} />
                       </label>
                       <label>

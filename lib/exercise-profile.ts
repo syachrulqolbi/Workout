@@ -28,10 +28,12 @@ export const STRENGTH_LEVELS = [
   { name: 'Elite', color: '#111111' },
 ] as const;
 
-export const PULL_UP_LEVEL_NAMES = [
+export const CUSTOM_TRAINING_LEVEL_NAMES = [
   'Novice', 'Beginner', 'Elementary', 'Developing', 'Intermediate',
   'Proficient', 'Strong', 'Advanced', 'Expert', 'Elite',
 ] as const;
+
+export const PULL_UP_LEVEL_NAMES = CUSTOM_TRAINING_LEVEL_NAMES;
 
 const PLAN_BASELINE_LEVEL = 4;
 const MAX_STRENGTH_LEVEL = STRENGTH_LEVELS.length;
@@ -123,6 +125,11 @@ export function exerciseNamesMatch(left: string, right: string) {
   return normalizedName(canonicalExerciseName(left)) === normalizedName(canonicalExerciseName(right));
 }
 
+export function isLoadedBackExtension(exercise: { id?: string; name: string }) {
+  return exercise.id === 'exercise-loaded-back-extension'
+    || stableExerciseId(exercise.name) === 'exercise-loaded-back-extension';
+}
+
 function rounded(value: number) {
   return Math.round(value * 2) / 2;
 }
@@ -141,6 +148,7 @@ export type StrengthLevel = {
   unit: 'kg' | 'reps' | 'sec';
   ranges: Array<{ min: number; max: number | null }>;
   levelNames?: readonly string[];
+  isAddedWeight?: boolean;
 };
 
 function explicitLevelRanges(thresholds: number[]) {
@@ -257,9 +265,11 @@ export function strengthLevelForExercise(exercise: LibraryExercise, history: Exe
   if (exercise.levelStandard) {
     const { thresholds, metric, unit } = exercise.levelStandard;
     const ranges = explicitLevelRanges(thresholds);
-    const pullUpProgression = stableExerciseId(canonicalExerciseName(exercise.name)) === 'exercise-pull-up'
+    const exerciseKey = stableExerciseId(canonicalExerciseName(exercise.name));
+    const pullUpProgression = exerciseKey === 'exercise-pull-up'
       && metric === 'assistanceEquivalent';
-    const levelNames = pullUpProgression ? PULL_UP_LEVEL_NAMES : undefined;
+    const backExtensionProgression = exerciseKey === 'exercise-loaded-back-extension' && metric === 'weight';
+    const levelNames = pullUpProgression || backExtensionProgression ? CUSTOM_TRAINING_LEVEL_NAMES : undefined;
     const historyValues = matches.flatMap((record) => {
       if (metric === 'weight') return [record.weight];
       if (metric === 'assistanceEquivalent') return [record.loadMode === 'assistance' ? -record.weight : record.weight];
@@ -280,6 +290,7 @@ export function strengthLevelForExercise(exercise: LibraryExercise, history: Exe
       index, ...STRENGTH_LEVELS[index - 1], name: levelNames?.[index - 1] ?? STRENGTH_LEVELS[index - 1].name, load: rounded(load),
       rangeMin: thresholds[index - 1], rangeMax: thresholds[Math.min(index, thresholds.length - 1)],
       isAssistance, hasHistory: historyValues.length > 0, loadMode: exercise.loadMode, metric, unit, ranges, levelNames,
+      isAddedWeight: backExtensionProgression,
     };
   }
 

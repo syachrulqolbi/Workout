@@ -3,6 +3,7 @@ import type {
   ExerciseRecord,
   LibraryExercise,
 } from '@/lib/workout-data';
+import { stableExerciseId } from '@/lib/workout-schema.mjs';
 
 export type CardioProgressMetric = 'durationMinutes' | 'distanceKm' | 'calories';
 export type ExerciseProgressMetric = 'weight' | 'reps' | 'durationSeconds' | CardioProgressMetric;
@@ -15,7 +16,7 @@ export type ExerciseProgressDefinition = {
 };
 
 type PlannedExercise = Pick<LibraryExercise,
-  'type' | 'measurement' | 'loadMode' | 'weight' | 'reps' | 'durationSeconds' | 'durationMinutes' | 'distanceKm' | 'calories' | 'levelStandard'
+  'id' | 'name' | 'type' | 'measurement' | 'loadMode' | 'weight' | 'reps' | 'durationSeconds' | 'durationMinutes' | 'distanceKm' | 'calories' | 'levelStandard'
 >;
 
 function strengthMetric(exercise?: PlannedExercise, record?: ExerciseRecord): ExerciseLevelMetric {
@@ -45,7 +46,10 @@ export function exerciseProgressDefinition(
   }
   return {
     metric: 'weight', unit: 'kg',
-    label: exercise?.loadMode === 'perSide' ? 'Max weight per side' : 'Max weight',
+    label: exercise && (exercise.id === 'exercise-loaded-back-extension'
+      || stableExerciseId(exercise.name) === 'exercise-loaded-back-extension')
+      ? 'Max added weight'
+      : exercise?.loadMode === 'perSide' ? 'Max weight per side' : 'Max weight',
     inverse: false,
   };
 }

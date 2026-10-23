@@ -46,6 +46,15 @@ describe('exercise progress metrics', () => {
     expect(exercisePlanProgressValue(plan, definition)).toBe(15);
   });
 
+  it('charts Loaded back extension by added kilograms', () => {
+    const plan = exercise({ id: 'exercise-loaded-back-extension', name: 'Loaded back extension (A)', weight: 20,
+      levelStandard: { thresholds: [0, 5, 10, 15, 20, 25, 30, 35, 40, 50], metric: 'weight', unit: 'kg' } });
+    const definition = exerciseProgressDefinition(plan);
+    expect(definition.metric).toBe('weight');
+    expect(definition.label).toBe('Max added weight');
+    expect(exercisePlanProgressValue(plan, definition)).toBe(20);
+  });
+
   it('marks machine assistance as inverse progress and chooses the lowest set', () => {
     const plan = exercise({ loadMode: 'assistance', weight: 28.5 });
     const definition = exerciseProgressDefinition(plan);

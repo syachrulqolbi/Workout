@@ -28,4 +28,9 @@ describe('workout level thresholds', () => {
     expect(stableExerciseId('Weighted Pull-Up')).toBe('exercise-pull-up');
     expect(stableExerciseId('Pullup')).toBe('exercise-pull-up');
   });
+
+  it('uses one stable identity for both Loaded back extension plan slots', () => {
+    expect(stableExerciseId('Loaded back extension (A)')).toBe('exercise-loaded-back-extension');
+    expect(stableExerciseId('Loaded back extension (B)')).toBe('exercise-loaded-back-extension');
+  });
 });

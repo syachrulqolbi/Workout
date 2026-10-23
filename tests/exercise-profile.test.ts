@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PULL_UP_LEVEL_NAMES, strengthLevelForActiveExercise, strengthLevelForExercise, strengthLevelForWorkoutExercise } from '../lib/exercise-profile';
+import { CUSTOM_TRAINING_LEVEL_NAMES, PULL_UP_LEVEL_NAMES, strengthLevelForActiveExercise, strengthLevelForExercise, strengthLevelForWorkoutExercise } from '../lib/exercise-profile';
 import type { ExerciseEntry, ExerciseRecord, LibraryExercise } from '../lib/workout-data';
 
 const pullUpStandard = {
@@ -39,6 +39,20 @@ describe('strength levels', () => {
     expect(strengthLevelForExercise(exercise(), [pullUpRecord('bodyweight', 0)])?.name).toBe('Proficient');
     expect(strengthLevelForExercise(exercise(), [pullUpRecord('total', 20)])?.name).toBe('Expert');
     expect(strengthLevelForExercise(exercise(), [pullUpRecord('total', 35)])?.name).toBe('Elite');
+  });
+
+  it('uses added weight and custom milestones for Loaded back extension', () => {
+    const backExtension = exercise({
+      id: 'exercise-loaded-back-extension', name: 'Loaded back extension (B)', loadMode: 'total', weight: 20,
+      reps: 12, sets: 3, restSeconds: 90,
+      levelStandard: { thresholds: [0, 5, 10, 15, 20, 25, 30, 35, 40, 50], metric: 'weight', unit: 'kg' },
+    });
+    const level = strengthLevelForExercise(backExtension, []);
+    expect(level?.index).toBe(5);
+    expect(level?.name).toBe('Intermediate');
+    expect(level?.levelNames).toEqual(CUSTOM_TRAINING_LEVEL_NAMES);
+    expect(level?.isAddedWeight).toBe(true);
+    expect(level?.load).toBe(20);
   });
 
   it('uses the next explicit tier at an exact threshold', () => {

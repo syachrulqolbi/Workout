@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { ArrowRight, ChevronRight, Dumbbell, Plus, Settings2, Timer } from 'lucide-react';
 import type { View } from '@/features/workout/components/app-navigation';
+import { isLoadedBackExtension } from '@/lib/exercise-profile';
 import { DAY_NAMES, DAY_SHORT, type ActiveWorkout, type DayPlan, type ExerciseRecord, type Meal, type WorkoutSession } from '@/lib/workout-data';
 import { mealNutritionOverview, mondayIndex, weeklyWorkoutMinutes } from '@/lib/workout-ui';
 
@@ -82,7 +83,7 @@ export function Dashboard({ plan, dayPlans, scheduledDay, defaultDay, meals, wor
 
       <section className="card exercises-card today-outline-soft">
         <div className="section-heading"><div><span className="muted-label">TODAY’S PLAN</span><h3>{plan.name}</h3></div><button className="manage-button" onClick={openLibrary}><Settings2 size={14} /> Manage</button></div>
-        {plan.exercises.length ? <div className="exercise-list">{plan.exercises.map((exercise, index) => <div className="exercise-row" key={`${exercise.id}:${index}`}><span className="exercise-index">{String(index + 1).padStart(2, '0')}</span><div><strong>{exercise.name}</strong><span>{exercise.type === 'cardio' ? `${exercise.durationMinutes} min${exercise.distanceKm ? ` · ${exercise.distanceKm} km` : ''}` : exercise.measurement === 'duration' ? `${exercise.sets} sets · ${exercise.durationSeconds} sec` : `${exercise.sets} sets · ${exercise.reps} reps · ${exercise.loadMode === 'bodyweight' ? 'bodyweight' : exercise.loadMode === 'assistance' ? `${exercise.weight} kg assistance` : `${exercise.weight} kg`}`}</span></div>{exercise.type === 'cardio' && <b>CARDIO</b>}<ChevronRight size={16} /></div>)}</div> : <div className="library-empty-inline"><Dumbbell size={22} /><span>No exercises for today.</span><button onClick={openLibrary}>Build today’s plan</button></div>}
+        {plan.exercises.length ? <div className="exercise-list">{plan.exercises.map((exercise, index) => <div className="exercise-row" key={`${exercise.id}:${index}`}><span className="exercise-index">{String(index + 1).padStart(2, '0')}</span><div><strong>{exercise.name}</strong><span>{exercise.type === 'cardio' ? `${exercise.durationMinutes} min${exercise.distanceKm ? ` · ${exercise.distanceKm} km` : ''}` : exercise.measurement === 'duration' ? `${exercise.sets} sets · ${exercise.durationSeconds} sec` : `${exercise.sets} sets · ${exercise.reps} reps · ${exercise.loadMode === 'bodyweight' ? 'bodyweight' : exercise.loadMode === 'assistance' ? `${exercise.weight} kg assistance` : isLoadedBackExtension(exercise) ? exercise.weight ? `+${exercise.weight} kg added` : 'bodyweight' : `${exercise.weight} kg`}`}</span></div>{exercise.type === 'cardio' && <b>CARDIO</b>}<ChevronRight size={16} /></div>)}</div> : <div className="library-empty-inline"><Dumbbell size={22} /><span>No exercises for today.</span><button onClick={openLibrary}>Build today’s plan</button></div>}
       </section>
 
       <MuscleVisualization plans={dayPlans} history={exerciseHistory} resetAt={levelResetAt} />

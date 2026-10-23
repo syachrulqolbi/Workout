@@ -2,7 +2,7 @@
 
 import { Check, ChevronLeft, ChevronRight, Clock3, Plus, Timer, TrendingUp, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { strengthLevelForWorkoutExercise } from '@/lib/exercise-profile';
+import { isLoadedBackExtension, strengthLevelForWorkoutExercise } from '@/lib/exercise-profile';
 import { type ActiveRestTimer, type ActiveWorkout, type ExerciseEntry, type ExerciseRecord, type LibraryExercise, type SetEntry } from '@/lib/workout-data';
 import { indexLatestExerciseRecords, latestExerciseRecord } from '@/lib/workout-identity';
 import { formatTimer } from '@/lib/workout-ui';
@@ -216,6 +216,7 @@ function ExerciseMetrics({ exercise }: { exercise: ExerciseEntry }) {
     : exercise.measurement === 'duration' ? `${exercise.targetDurationSeconds} sec`
     : exercise.loadMode === 'bodyweight' ? 'Bodyweight'
     : exercise.loadMode === 'assistance' ? `${exercise.targetWeight} kg assist`
+    : isLoadedBackExtension(exercise) ? exercise.targetWeight ? `+${exercise.targetWeight} kg` : 'Bodyweight'
     : `${exercise.targetWeight} kg`;
   const effort = exercise.type === 'cardio' ? 'Cardio'
     : exercise.measurement === 'duration' ? 'Timed' : `${exercise.targetReps} reps`;
@@ -249,7 +250,7 @@ type SetTableProps = {
 function StrengthSetTable({ exercise, updateSet, deleteSet, toggleDone }: SetTableProps) {
   return (
     <div className="set-table">
-      <div className="set-head"><span>SET</span><span>{exercise.loadMode === 'assistance' ? 'ASSIST KG' : 'KG'}</span><span>REPS</span><span>DONE</span><span /></div>
+      <div className="set-head"><span>SET</span><span>{exercise.loadMode === 'assistance' ? 'ASSIST KG' : isLoadedBackExtension(exercise) ? 'ADDED KG' : 'KG'}</span><span>REPS</span><span>DONE</span><span /></div>
       {exercise.sets.map((set, index) => (
         <div className={`set-row ${set.done ? 'completed' : ''}`} key={set.id}>
           <strong>{index + 1}</strong>
