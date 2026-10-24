@@ -176,10 +176,16 @@ test('active workout keeps the card wide, compact and vertically usable', async 
   const cardBox = await card.boundingBox();
   const nextBox = await next.boundingBox();
   const headerBox = await dialog.locator('.workout-modal-header').boundingBox();
+  const dialogBox = await dialog.boundingBox();
+  const footerBox = await dialog.locator('.swipe-workout-footer').boundingBox();
   expect(cardBox?.width).toBeGreaterThanOrEqual(370);
   expect(headerBox?.height).toBeLessThanOrEqual(115);
   expect(nextBox?.width).toBeGreaterThanOrEqual(54);
   expect(nextBox?.height).toBeGreaterThanOrEqual(54);
+  expect(Math.abs(
+    ((dialogBox?.y ?? 0) + (dialogBox?.height ?? 0))
+      - ((footerBox?.y ?? 0) + (footerBox?.height ?? 0)),
+  )).toBeLessThanOrEqual(1);
 
   await expect(card.getByText('PROGRESSION')).toBeVisible();
   await next.click();

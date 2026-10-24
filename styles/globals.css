@@ -527,7 +527,7 @@ button.nav-item.active { background: var(--soft); }
 .table-state button { border: 0; background: transparent; text-decoration: underline; cursor: pointer; }
 
 .workout-modal { display: flex; flex-direction: column; overflow: hidden; }
-.workout-modal-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 18px; padding: 20px 28px 14px; background: #fafafa; }
+.workout-modal-header { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 18px; padding: 20px 28px 14px; background: #fafafa; }
 .workout-modal-heading { min-width: 0; }
 .workout-modal-title-line { display: flex; align-items: center; gap: 12px; margin-top: 5px; }
 .workout-modal-header h2 { min-width: 0; margin: 0; overflow: hidden; font-size: 24px; white-space: nowrap; text-overflow: ellipsis; }
@@ -535,9 +535,9 @@ button.nav-item.active { background: var(--soft); }
 .workout-clock strong { font-size: 12px; }
 .workout-session-meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 9px; color: var(--muted); font-size: 9px; }
 .workout-session-meta strong { color: var(--ink); font-weight: 500; white-space: nowrap; }
-.workout-progress { height: 4px; background: #e8e8e8; }
+.workout-progress { flex: 0 0 auto; height: 4px; background: #e8e8e8; }
 .workout-progress span { height: 100%; display: block; background: var(--ink); transition: width .25s ease; }
-.rest-timer-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 11px; padding: 12px 28px 13px; background: var(--ink); color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.rest-timer-bar { flex: 0 0 auto; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 11px; padding: 12px 28px 13px; background: var(--ink); color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
 .rest-timer-icon { width: 34px; height: 34px; display: grid; place-items: center; background: rgba(255,255,255,.12); border-radius: 9px; }
 .rest-timer-copy { min-width: 0; }
 .rest-timer-copy span, .rest-timer-copy strong, .rest-timer-copy small { display: block; }
@@ -549,7 +549,7 @@ button.nav-item.active { background: var(--soft); }
 .rest-timer-bar button { min-width: 62px; min-height: 42px; padding: 8px 10px; border: 1px solid #5d5d5d; background: transparent; color: #fff; border-radius: 9px; font: inherit; font-size: .75rem; cursor: pointer; }
 .rest-timer-bar button:hover { background: #444; }
 .rest-timer-bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-.workout-scroll { min-height: 0; overflow-y: auto; display: grid; gap: 12px; padding: 20px 28px; }
+.workout-scroll { min-height: 0; flex: 1 1 auto; overflow-y: auto; display: grid; gap: 12px; padding: 20px 28px; }
 .workout-deck-scroll { overflow-x: hidden; align-content: start; touch-action: pan-y; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
 .workout-deck { position: relative; min-width: 0; padding-inline: 28px; touch-action: pan-y; }
 .workout-card-peek { position: absolute; z-index: 0; top: 24px; bottom: 24px; width: 74px; overflow: hidden; padding: 0; border: 1px solid var(--line); background: #f7f7f7; color: var(--muted); border-radius: 16px; cursor: pointer; }
@@ -596,7 +596,7 @@ button.nav-item.active { background: var(--soft); }
 .delete-set:hover { background: #e6e6e6; color: #833; }
 .add-set-button { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; padding: 6px 8px; border: 0; background: var(--soft); border-radius: 8px; font-size: 8px; cursor: pointer; }
 .workout-deck-empty { padding: 50px 20px; text-align: center; color: var(--muted); }
-.workout-footer { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 16px 28px; background: #fafafa; border-top: 1px solid var(--line); }
+.workout-footer { flex: 0 0 auto; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 16px 28px; background: #fafafa; border-top: 1px solid var(--line); }
 .swipe-workout-footer { grid-template-columns: 1fr auto auto; }
 .workout-swipe-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 48px minmax(180px, 1fr) 48px; gap: 10px; }
 .workout-arrow { width: 48px; height: 48px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); background: #fff; border-radius: 16px; cursor: pointer; }
