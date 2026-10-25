@@ -204,6 +204,26 @@ export async function readWorkoutMainDocument(reference: DocumentReference, snap
   return { data, revision: numericRevision(stored.revision), summary: storedSummary(stored.summary, data) };
 }
 
+export async function readWorkoutReminderData(reference: DocumentReference) {
+  let document = await reference.get();
+  if (!document.exists) return null;
+  let stored = document.data() ?? {};
+  if (Number(stored.storageVersion) !== WORKOUT_STORAGE_VERSION) {
+    const data = normalizeWorkoutData(stored.data);
+    await migrateEmbeddedData(reference, document, data);
+    document = await reference.get();
+    stored = document.data() ?? {};
+  }
+  const operation = destructiveOperation(stored.destructiveOperation);
+  const meals = operation?.kind === 'reset-all' ? [] : await readItems<Meal>(reference, COLLECTIONS.meals);
+  return normalizeWorkoutData({
+    ...((stored.data && typeof stored.data === 'object') ? stored.data : {}),
+    workouts: [],
+    exerciseHistory: [],
+    meals,
+  });
+}
+
 async function addCollectionDiff(
   batch: WriteBatch,
   reference: DocumentReference,

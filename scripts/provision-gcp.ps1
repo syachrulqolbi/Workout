@@ -108,6 +108,37 @@ if ($LASTEXITCODE -ne 0) {
   --quiet
 Assert-GcloudSuccess 'allowing the runtime to read the Workout session secret'
 
+$vapidPublicSecretName = 'workout-vapid-public-key'
+$vapidPrivateSecretName = 'workout-vapid-private-key'
+& $gcloudCommand secrets describe $vapidPublicSecretName --project=$ProjectId *> $null
+$vapidPublicExists = $LASTEXITCODE -eq 0
+& $gcloudCommand secrets describe $vapidPrivateSecretName --project=$ProjectId *> $null
+$vapidPrivateExists = $LASTEXITCODE -eq 0
+if (-not $vapidPublicExists -or -not $vapidPrivateExists) {
+  $vapidKeys = (& node -e "process.stdout.write(JSON.stringify(require('web-push').generateVAPIDKeys()))" | ConvertFrom-Json)
+  if ($vapidPublicExists) {
+    $vapidKeys.publicKey | & $gcloudCommand secrets versions add $vapidPublicSecretName --data-file=- --project=$ProjectId
+  } else {
+    $vapidKeys.publicKey | & $gcloudCommand secrets create $vapidPublicSecretName --data-file=- --replication-policy=automatic --project=$ProjectId
+  }
+  Assert-GcloudSuccess 'storing the VAPID public key'
+  if ($vapidPrivateExists) {
+    $vapidKeys.privateKey | & $gcloudCommand secrets versions add $vapidPrivateSecretName --data-file=- --project=$ProjectId
+  } else {
+    $vapidKeys.privateKey | & $gcloudCommand secrets create $vapidPrivateSecretName --data-file=- --replication-policy=automatic --project=$ProjectId
+  }
+  Assert-GcloudSuccess 'storing the VAPID private key'
+}
+
+foreach ($secretName in @($vapidPublicSecretName, $vapidPrivateSecretName)) {
+  & $gcloudCommand secrets add-iam-policy-binding $secretName `
+    --member="serviceAccount:$runtimeEmail" `
+    --role='roles/secretmanager.secretAccessor' `
+    --project=$ProjectId `
+    --quiet
+  Assert-GcloudSuccess "allowing the runtime to read $secretName"
+}
+
 $cleanupEmail = "$CleanupServiceAccount@$ProjectId.iam.gserviceaccount.com"
 & $gcloudCommand iam service-accounts describe $cleanupEmail --project=$ProjectId *> $null
 if ($LASTEXITCODE -ne 0) {
@@ -172,6 +203,32 @@ if ($LASTEXITCODE -eq 0) {
       --project=$ProjectId
     Assert-GcloudSuccess 'creating the inactive-user cleanup schedule'
   }
+
+  $reminderUri = "$SiteUrl/api/maintenance/reminders"
+  & $gcloudCommand scheduler jobs describe workout-reminder-dispatch --location=$Region --project=$ProjectId *> $null
+  if ($LASTEXITCODE -eq 0) {
+    & $gcloudCommand scheduler jobs update http workout-reminder-dispatch `
+      --location=$Region `
+      --schedule='*/5 * * * *' `
+      --time-zone='UTC' `
+      --uri=$reminderUri `
+      --http-method=POST `
+      --oidc-service-account-email=$cleanupEmail `
+      --oidc-token-audience=$reminderUri `
+      --project=$ProjectId
+    Assert-GcloudSuccess 'updating the workout reminder schedule'
+  } else {
+    & $gcloudCommand scheduler jobs create http workout-reminder-dispatch `
+      --location=$Region `
+      --schedule='*/5 * * * *' `
+      --time-zone='UTC' `
+      --uri=$reminderUri `
+      --http-method=POST `
+      --oidc-service-account-email=$cleanupEmail `
+      --oidc-token-audience=$reminderUri `
+      --project=$ProjectId
+    Assert-GcloudSuccess 'creating the workout reminder schedule'
+  }
 }
 
-Write-Output "GCP infrastructure, authentication APIs and cleanup workflow are ready in $ProjectId/$Region."
+Write-Output "GCP infrastructure, authentication APIs, cleanup and reminder workflows are ready in $ProjectId/$Region."

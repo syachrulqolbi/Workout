@@ -1,21 +1,14 @@
-import { OAuth2Client } from 'google-auth-library';
 import { Timestamp } from '@google-cloud/firestore';
 import type { NextRequest } from 'next/server';
 import { apiError, apiJson } from '@/lib/server/api-response';
 import { getFirestore, workoutAuditCollection, workoutUsersCollection } from '@/lib/server/firestore';
+import { verifySchedulerRequest } from '@/lib/server/scheduler-auth';
 import { recursivelyDeleteWorkoutUser } from '@/lib/server/workout-repository';
 
-const googleClient = new OAuth2Client();
-
 async function verifyScheduler(request: NextRequest) {
-  const authorization = request.headers.get('authorization');
-  if (!authorization?.startsWith('Bearer ')) return false;
   const audience = process.env.CLEANUP_AUDIENCE ?? 'https://workout.sqnsportfolio.com/api/maintenance/cleanup';
   const expectedEmail = process.env.CLEANUP_SERVICE_ACCOUNT ?? 'workout-cleanup@personal-project-414620.iam.gserviceaccount.com';
-  try {
-    const ticket = await googleClient.verifyIdToken({ idToken: authorization.slice(7), audience });
-    return ticket.getPayload()?.email === expectedEmail;
-  } catch { return false; }
+  return verifySchedulerRequest(request, audience, expectedEmail);
 }
 
 export async function cleanupInactiveUsers(request: NextRequest) {

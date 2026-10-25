@@ -212,6 +212,13 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
   const [loadError, setLoadError] = useState('');
   const recoveryKey = `workout-recovery:${user.uid}`;
 
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('view');
+    if (requested !== 'today' && requested !== 'history' && requested !== 'meals' && requested !== 'calendar' && requested !== 'settings') return;
+    const timeout = window.setTimeout(() => setView(requested), 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
   const updateData = useCallback((updater: (current: WorkoutData) => WorkoutData, scopes: ClientDataScope[] = ['active']) => {
     const revision = latestDirtyRevision.current + 1;
     latestDirtyRevision.current = revision;
@@ -445,7 +452,14 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
   const historyVolume = data.workouts.reduce((sum, workout) => sum + workout.volume, 0);
   const firstName = user.displayName?.trim().split(/\s+/)[0] || 'athlete';
 
-  function navigate(next: View) { setView(next); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function navigate(next: View) {
+    setView(next);
+    const url = new URL(window.location.href);
+    if (next === 'today') url.searchParams.delete('view');
+    else url.searchParams.set('view', next);
+    window.history.replaceState(window.history.state, '', url);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   function startOrResumeWorkout() {
     if (active) { setWorkoutOpen(true); return; }

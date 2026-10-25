@@ -1,4 +1,4 @@
-const CACHE_NAME = 'workout-shell-v4';
+const CACHE_NAME = 'workout-shell-v5';
 const APP_SHELL = ['/', '/privacy', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -48,4 +48,35 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(caches.match(request).then((cached) => cached || refreshed));
     event.waitUntil(refreshed.then(() => undefined).catch(() => undefined));
   }
+});
+
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try { payload = event.data?.json() ?? {}; } catch { payload = { body: event.data?.text() ?? '' }; }
+  const title = payload.title || 'Workout reminder';
+  const options = {
+    body: payload.body || 'Open Workout to see today’s plan.',
+    icon: payload.icon || '/icons/workout-192.png',
+    badge: payload.badge || '/icons/workout-192.png',
+    tag: payload.tag || 'workout-reminder',
+    renotify: false,
+    data: { url: payload.url || '/' },
+  };
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(title, options),
+    typeof self.navigator.setAppBadge === 'function' ? self.navigator.setAppBadge(1) : Promise.resolve(),
+  ]));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clients) => {
+    const existing = clients.find((client) => new URL(client.url).origin === self.location.origin);
+    if (existing) {
+      await existing.navigate(targetUrl);
+      return existing.focus();
+    }
+    return self.clients.openWindow(targetUrl);
+  }));
 });

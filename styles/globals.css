@@ -502,6 +502,34 @@ button.nav-item.active { background: var(--soft); }
 .account-card h2 { margin: 5px 0 2px; font-size: 22px; }
 .account-card p, .privacy-card p, .danger-card p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.7; }
 .secondary-button.inline { width: auto; }
+.notification-card { grid-column: 1 / -1; display: grid; gap: 20px; }
+.notification-card-heading { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 16px; }
+.notification-icon { width: 48px; height: 48px; display: grid; place-items: center; background: var(--ink); color: #fff; border-radius: 14px; }
+.notification-card h2 { margin: 5px 0 4px; font-size: 21px; letter-spacing: -.025em; }
+.notification-card-heading p { max-width: 640px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.65; }
+.notification-status { min-height: 30px; display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; background: var(--soft); color: var(--muted); border-radius: 99px; font-size: 8px; font-weight: 600; letter-spacing: .08em; }
+.notification-status.enabled { background: #edf5f0; color: #306548; }
+.notification-guidance { min-height: 68px; display: flex; align-items: center; gap: 13px; padding: 15px 17px; background: var(--soft); border: 1px solid var(--line); border-radius: 14px; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.notification-guidance svg { flex: 0 0 auto; color: var(--ink); }
+.notification-guidance strong { display: block; margin-bottom: 2px; color: var(--ink); }
+.reminder-schedule-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+.reminder-schedule { min-width: 0; display: grid; gap: 14px; padding: 14px; background: #fafafa; border: 1px solid var(--line); border-radius: 14px; transition: border-color .18s ease, background-color .18s ease; }
+.reminder-schedule.active { background: #fff; border-color: #bdbdbd; }
+.reminder-toggle { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; cursor: pointer; }
+.reminder-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.reminder-toggle i { width: 27px; height: 17px; position: relative; display: block; background: #d4d4d4; border-radius: 99px; transition: background-color .18s ease; }
+.reminder-toggle i::after { content: ''; width: 11px; height: 11px; position: absolute; top: 3px; left: 3px; background: #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.18); transition: transform .18s ease; }
+.reminder-toggle input:checked + i { background: var(--ink); }
+.reminder-toggle input:checked + i::after { transform: translateX(10px); }
+.reminder-toggle input:focus-visible + i { outline: 2px solid var(--ink); outline-offset: 3px; }
+.reminder-toggle strong { grid-column: 2; min-width: 0; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.reminder-time { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.reminder-time input { min-width: 0; width: 100%; height: 34px; padding: 0 7px; border: 1px solid var(--line); background: #fff; border-radius: 9px; color: var(--ink); font: inherit; font-size: 10px; }
+.reminder-time input:disabled { opacity: .45; }
+.notification-actions { display: flex; align-items: center; gap: 9px; }
+.notification-actions .complete-button { min-width: 190px; }
+.notification-message { margin: -8px 0 0; color: #306548; font-size: 10px; }
+.notification-footnote { color: var(--muted); font-size: 9px; line-height: 1.55; }
 .privacy-card { display: grid; grid-template-columns: auto 1fr; align-content: start; gap: 15px; min-height: 220px; }
 .privacy-card h3, .danger-card h3 { margin: 7px 0 8px; font-size: 17px; }
 .danger-card { min-height: 220px; display: flex; flex-direction: column; align-items: flex-start; border-color: #ded1d1; }
@@ -633,6 +661,8 @@ button.nav-item.active { background: var(--soft); }
 @media (max-width: 820px) {
   .settings-grid { grid-template-columns: 1fr; }
   .account-card { grid-column: auto; }
+  .notification-card { grid-column: auto; }
+  .reminder-schedule-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .history-momentum { grid-template-columns: auto minmax(0, 1fr); }
   .history-best { grid-column: 1 / -1; min-height: 0; }
 }
@@ -658,6 +688,10 @@ button.nav-item.active { background: var(--soft); }
   .history-export-actions button { flex: 1; }
   .account-card { grid-template-columns: auto 1fr; }
   .account-card .secondary-button { grid-column: 1 / -1; width: 100%; }
+  .notification-card-heading { grid-template-columns: auto minmax(0, 1fr); }
+  .notification-status { grid-column: 1 / -1; justify-self: start; }
+  .notification-actions { display: grid; grid-template-columns: 1fr; }
+  .notification-actions .complete-button, .notification-actions .secondary-button { width: 100%; }
   .admin-toolbar { display: grid; }
   .search-box { width: 100%; max-width: none; }
   .admin-danger-actions { display: grid; grid-template-columns: 1fr; }
