@@ -29,6 +29,9 @@ test('authenticated mobile shell respects safe spacing and keeps navigation clea
   await expect(navigation.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-current', 'page');
 
   const exercisePicker = page.getByRole('combobox', { name: 'Choose an exercise for the muscle map' });
+  await expect(page.getByRole('button', { name: /detailed map/i })).toHaveCount(0);
+  await expect(page.locator('.body-map-panel')).toBeVisible();
+  await expect(page.locator('.muscle-detail-panel')).toBeVisible();
   const exerciseValue = await exercisePicker.locator('option').nth(1).getAttribute('value');
   expect(exerciseValue).toBeTruthy();
   await exercisePicker.selectOption(exerciseValue!);

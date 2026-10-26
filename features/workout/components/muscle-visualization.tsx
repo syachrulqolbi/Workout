@@ -1,7 +1,7 @@
 'use client';
 
 import { Activity, ChevronDown, Dumbbell } from 'lucide-react';
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import {
   MUSCLE_LABELS, STRENGTH_LEVELS, createStrengthLevelResolver, musclesForExercise, strengthLevelForExercise,
   type ExerciseMuscles, type MuscleGroup,
@@ -52,8 +52,6 @@ export function MuscleVisualization({ plans, history, resetAt }: { plans: DayPla
   const resolveLevel = useMemo(() => createStrengthLevelResolver(history, resetAt), [history, resetAt]);
   const levels = useMemo(() => new Map(planExercises.map((item) => [item.key, resolveLevel(item.exercise)])), [planExercises, resolveLevel]);
   const [selectedId, setSelectedId] = useState('summary');
-  const [mobileExpanded, setMobileExpanded] = useState(false);
-  const [compactViewport, setCompactViewport] = useState(true);
   const selectedEntry = selectedId === 'summary' ? undefined : planExercises.find((item) => item.key === selectedId);
   const selected = selectedEntry?.exercise;
   const summary = useMemo(() => summarizePlan(exercises, resolveLevel), [exercises, resolveLevel]);
@@ -63,15 +61,6 @@ export function MuscleVisualization({ plans, history, resetAt }: { plans: DayPla
 
   const color = selected ? level?.color ?? '#4b4b4b' : '#303030';
   const labels = [...muscles.primary, ...muscles.secondary].map((group) => MUSCLE_LABELS[group]).join(', ');
-  const showDetailedMap = !compactViewport || mobileExpanded;
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 720px)');
-    const update = () => setCompactViewport(media.matches);
-    update();
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
 
   return (
     <section className="card muscle-card" style={{ '--muscle-color': color } as CSSProperties}>
@@ -84,16 +73,11 @@ export function MuscleVisualization({ plans, history, resetAt }: { plans: DayPla
         <>
           <label className="muscle-view-picker">
             <span>SELECT EXERCISE</span>
-            <div><Dumbbell size={17} /><select value={selectedEntry?.key ?? 'summary'} onChange={(event) => { setSelectedId(event.target.value); setMobileExpanded(true); }} aria-label="Choose an exercise for the muscle map"><option value="summary">Full weekly plan summary</option>{plans.filter((plan) => plan.exercises.length).map((plan) => <optgroup key={plan.day} label={`${DAY_NAMES[plan.day]} · ${plan.name}`}>{plan.exercises.map((exercise) => { const exerciseLevel = levels.get(`${plan.day}:${exercise.id}`); return <option key={exercise.id} value={`${plan.day}:${exercise.id}`}>{exercise.name} · {exerciseLevel ? `L${exerciseLevel.index} ${exerciseLevel.name}` : exercise.type === 'cardio' ? 'Cardio' : 'No level standard'}</option>; })}</optgroup>)}</select><ChevronDown size={17} /></div>
+            <div><Dumbbell size={17} /><select value={selectedEntry?.key ?? 'summary'} onChange={(event) => setSelectedId(event.target.value)} aria-label="Choose an exercise for the muscle map"><option value="summary">Full weekly plan summary</option>{plans.filter((plan) => plan.exercises.length).map((plan) => <optgroup key={plan.day} label={`${DAY_NAMES[plan.day]} · ${plan.name}`}>{plan.exercises.map((exercise) => { const exerciseLevel = levels.get(`${plan.day}:${exercise.id}`); return <option key={exercise.id} value={`${plan.day}:${exercise.id}`}>{exercise.name} · {exerciseLevel ? `L${exerciseLevel.index} ${exerciseLevel.name}` : exercise.type === 'cardio' ? 'Cardio' : 'No level standard'}</option>; })}</optgroup>)}</select><ChevronDown size={17} /></div>
             <small>{selectedEntry ? `${DAY_NAMES[selectedEntry.day]} plan · ${level ? `Level ${level.index} ${level.name}` : 'Cardio'}` : `${exercises.length} planned slots · ${uniqueExerciseCount} unique exercises`}</small>
           </label>
 
-          <button className="muscle-mobile-toggle" type="button" aria-expanded={mobileExpanded} onClick={() => setMobileExpanded((expanded) => !expanded)}>
-            {mobileExpanded ? 'Hide detailed map' : 'View detailed map'}
-            <ChevronDown size={16} aria-hidden="true" />
-          </button>
-
-          {showDetailedMap && <div className="muscle-content">
+          <div className="muscle-content">
             <div className="body-map-panel">
               <div className="body-map-title"><span>{selected?.name ?? 'Full weekly coverage'}</span><small>{selected ? labels || 'Muscle groups unavailable' : `${uniqueExerciseCount} unique exercises · ${summary.muscles.length} groups trained`}</small></div>
               <div className="body-map-pair" role="img" aria-label={selected ? `${selected.name} trains ${labels}` : `The complete weekly plan trains ${labels}`}>
@@ -110,7 +94,7 @@ export function MuscleVisualization({ plans, history, resetAt }: { plans: DayPla
                 <div>{muscles.primary.map((group) => <b key={group}>{MUSCLE_LABELS[group]}</b>)}{muscles.secondary.map((group) => <span key={group}>{MUSCLE_LABELS[group]}</span>)}</div>
               </div>
             </div>
-          </div>}
+          </div>
         </>
       ) : (
         <div className="muscle-empty"><span><Dumbbell size={21} /></span><strong>No exercises planned</strong><p>Add exercises to a weekday plan to build your training map.</p></div>
