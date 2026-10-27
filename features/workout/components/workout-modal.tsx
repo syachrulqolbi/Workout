@@ -6,7 +6,7 @@ import {
   bestWeightedHoldPerformance, isLoadedBackExtension, isWeightedHoldStandard,
   strengthLevelForWorkoutExercise, weightedHoldLevel,
 } from '@/lib/exercise-profile';
-import { type ActiveRestTimer, type ActiveWorkout, type ExerciseEntry, type ExerciseRecord, type LibraryExercise, type SetEntry } from '@/lib/workout-data';
+import { type ActiveRestTimer, type ActiveWorkout, type ExerciseEntry, type ExerciseRecord, type LibraryExercise, type SetEntry, type StrengthProfile } from '@/lib/workout-data';
 import { indexLatestExerciseRecords, latestExerciseRecord } from '@/lib/workout-identity';
 import { formatTimer } from '@/lib/workout-ui';
 import { useDialogAccessibility } from '@/features/workout/hooks/use-dialog-accessibility';
@@ -16,6 +16,7 @@ type WorkoutModalProps = {
   exerciseHistory: ExerciseRecord[];
   levelExercises: LibraryExercise[];
   levelResetAt: string;
+  profile: StrengthProfile;
   finishedSets: number;
   totalSets: number;
   totalVolume: number;
@@ -24,14 +25,15 @@ type WorkoutModalProps = {
   addSet: (exerciseId: string) => void;
   deleteSet: (exerciseId: string, setId: string) => void;
   updateRestTimer: (timer: ActiveRestTimer | null) => void;
+  updateExerciseLoadMode: (exerciseId: string, mode: ExerciseEntry['loadMode']) => void;
   close: () => void;
   discard: () => void;
   complete: (elapsedSeconds: number) => void;
 };
 
 export function WorkoutModal({
-  workout, exerciseHistory, levelExercises, levelResetAt, finishedSets, totalSets, totalVolume, cardioMinutes,
-  updateSet, addSet, deleteSet, updateRestTimer, close, discard, complete,
+  workout, exerciseHistory, levelExercises, levelResetAt, profile, finishedSets, totalSets, totalVolume, cardioMinutes,
+  updateSet, addSet, deleteSet, updateRestTimer, updateExerciseLoadMode, close, discard, complete,
 }: WorkoutModalProps) {
   const restTimer = workout.restTimer;
   const [timerNow, setTimerNow] = useState(() => Date.now());
@@ -49,7 +51,7 @@ export function WorkoutModal({
   const previousExercise = activeIndex > 0 ? workout.exercises[activeIndex - 1] : null;
   const nextExercise = activeIndex < workout.exercises.length - 1 ? workout.exercises[activeIndex + 1] : null;
   const activeLevel = activeExercise
-    ? strengthLevelForWorkoutExercise(activeExercise, levelExercises, exerciseHistory, levelResetAt)
+    ? strengthLevelForWorkoutExercise(activeExercise, levelExercises, exerciseHistory, levelResetAt, profile)
     : null;
   const elapsed = Math.max(0, Math.floor((elapsedNow - new Date(workout.startedAt).getTime()) / 1000));
 
@@ -186,6 +188,7 @@ export function WorkoutModal({
                 </div>
 
                 <ExerciseMetrics exercise={activeExercise} />
+                {activeExercise.id === 'exercise-pull-up' && <PullUpModePicker exercise={activeExercise} update={updateExerciseLoadMode} />}
                 <ProgressionGuidance exercise={activeExercise} previous={latestExerciseRecord(latestRecords, activeExercise)} />
 
                 {activeExercise.type === 'strength' && activeExercise.measurement === 'duration' ? (
@@ -212,6 +215,11 @@ export function WorkoutModal({
       </section>
     </div>
   );
+}
+
+function PullUpModePicker({ exercise, update }: { exercise: ExerciseEntry; update: WorkoutModalProps['updateExerciseLoadMode'] }) {
+  const mode = exercise.loadMode === 'assistance' ? 'assisted' : exercise.loadMode === 'bodyweight' ? 'bodyweight' : 'weighted';
+  return <label className="pull-up-mode"><span>PULL-UP MODE</span><select value={mode} onChange={(event) => update(exercise.id, event.target.value === 'assisted' ? 'assistance' : event.target.value === 'weighted' ? 'total' : 'bodyweight')}><option value="assisted">Assisted · machine counterweight</option><option value="bodyweight">Bodyweight · no external load</option><option value="weighted">Weighted · added load</option></select></label>;
 }
 
 function ExerciseMetrics({ exercise }: { exercise: ExerciseEntry }) {
@@ -255,7 +263,7 @@ type SetTableProps = {
 function StrengthSetTable({ exercise, updateSet, deleteSet, toggleDone }: SetTableProps) {
   return (
     <div className="set-table">
-      <div className="set-head"><span>SET</span><span>{exercise.loadMode === 'assistance' ? 'ASSIST KG' : isLoadedBackExtension(exercise) ? 'ADDED KG' : 'KG'}</span><span>REPS</span><span>DONE</span><span /></div>
+      <div className="set-head"><span>SET</span><span>{exercise.loadMode === 'assistance' ? 'ASSIST KG' : isLoadedBackExtension(exercise) || exercise.id === 'exercise-pull-up' ? 'ADDED KG' : 'KG'}</span><span>REPS</span><span>DONE</span><span /></div>
       {exercise.sets.map((set, index) => (
         <div className={`set-row ${set.done ? 'completed' : ''}`} key={set.id}>
           <strong>{index + 1}</strong>

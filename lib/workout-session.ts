@@ -55,7 +55,8 @@ export function buildWorkout(
         targetWeight: startingWeight, targetReps: exercise.reps, targetDurationSeconds: startingDurationSeconds,
         targetDurationMinutes: exercise.durationMinutes,
         targetDistanceKm: exercise.distanceKm, restSeconds: exercise.restSeconds,
-        category: exercise.category, levelStandard: exercise.levelStandard,
+        category: exercise.category, repRangeMin: exercise.repRangeMin, repRangeMax: exercise.repRangeMax,
+        levelStandard: exercise.levelStandard,
         sets: Array.from({ length: exercise.sets }, () => ({
           id: createId(), weight: startingWeight, reps: exercise.reps, durationSeconds: startingDurationSeconds,
           durationMinutes: exercise.durationMinutes,

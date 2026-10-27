@@ -13,12 +13,13 @@ import type { NutritionDraft } from '@/features/workout/components/meal-modal';
 import { SettingsView } from '@/features/workout/components/settings-view';
 import type { AppUser } from '@/lib/auth-user';
 import { authenticatedFetch } from '@/lib/client/authenticated-fetch';
-import { canonicalExerciseName, isWeightedHoldStandard, weightedHoldLevel } from '@/lib/exercise-profile';
+import { canonicalExerciseName, isWeightedHoldStandard, strengthLevelForActiveExercise, weightedHoldLevel } from '@/lib/exercise-profile';
 import {
   compactDatePlanOverrides, compactMealCompletionDates, createDefaultWorkoutData, DAY_NAMES, isWorkoutData, normalizeWorkoutData, stableExerciseId,
   type ActiveWorkout, type DayPlan, type LibraryExercise, type Meal,
   type SetEntry, type WorkoutData, type WorkoutSession,
 } from '@/lib/workout-data';
+import { estimatedOneRepMax, STRENGTH_STANDARD_VERSION } from '@/lib/strength-calculations';
 import { dateSelectionAfterRollover, formatDate, localDateKey, mealsForDate, mondayIndex, workoutPlanForDate } from '@/lib/workout-ui';
 import { activeWorkoutVolume, bestCompletedSet } from '@/lib/workout-metrics';
 import { workoutMatchesPlan } from '@/lib/workout-identity';
@@ -264,7 +265,7 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
           } | null;
           if (recovery && Array.isArray(recovery.scopes)) {
             recoveredScopes = recovery.scopes.filter((scope): scope is ClientDataScope =>
-              scope === 'active' || scope === 'plans' || scope === 'schedule' || scope === 'history' || scope === 'meals');
+              scope === 'active' || scope === 'plans' || scope === 'schedule' || scope === 'history' || scope === 'meals' || scope === 'profile');
             const createdAt = new Date(String(recovery.createdAt ?? '')).getTime();
             const isFresh = Number.isFinite(createdAt) && Date.now() - createdAt <= RECOVERY_MAX_AGE_MS;
             const matchesRevision = Number(recovery.baseRevision) === serverRevision.current;
@@ -520,6 +521,20 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
     }));
   }
 
+  function updateExerciseLoadMode(exerciseId: string, loadMode: LibraryExercise['loadMode']) {
+    updateData((current) => !current.activeWorkout ? current : ({
+      ...current,
+      activeWorkout: {
+        ...current.activeWorkout,
+        exercises: current.activeWorkout.exercises.map((exercise) => {
+          if (exercise.id !== exerciseId) return exercise;
+          const weight = loadMode === 'bodyweight' ? 0 : exercise.loadMode === loadMode ? exercise.targetWeight : loadMode === 'assistance' ? 10 : 5;
+          return { ...exercise, loadMode, targetWeight: weight, sets: exercise.sets.map((set) => set.done ? set : { ...set, weight }) };
+        }),
+      },
+    }));
+  }
+
   function deleteSet(exerciseId: string, setId: string) {
     updateData((current) => !current.activeWorkout ? current : ({
       ...current, activeWorkout: {
@@ -544,6 +559,11 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
     setToast('In-progress workout discarded');
   }
 
+  function saveStrengthProfile(profile: WorkoutData['profile']) {
+    updateData((current) => ({ ...current, profile }), ['profile']);
+    setToast('Strength profile saved · recommendations recalculated');
+  }
+
   function completeWorkout(elapsedSeconds: number) {
     if (!active || !finishedSets) return;
     const id = crypto.randomUUID();
@@ -566,7 +586,10 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
             : set.durationSeconds >= exercise.targetDurationSeconds
           : (inverseLoad ? set.weight <= exercise.targetWeight : set.weight >= exercise.targetWeight) && set.reps >= exercise.targetReps
         : set.durationMinutes >= exercise.targetDurationMinutes && (!exercise.targetDistanceKm || set.distanceKm >= exercise.targetDistanceKm));
-      return completed.length ? [{
+      if (!completed.length) return [];
+      const rawEstimate = exercise.type === 'strength' && exercise.measurement === 'reps' && topStrengthSet
+        ? estimatedOneRepMax(topStrengthSet.weight, topStrengthSet.reps) : null;
+      const baseRecord = {
         id: crypto.randomUUID(), sessionId: id, exerciseId: exercise.id, exercise: exercise.name, date: completedAt,
         type: exercise.type, measurement: exercise.measurement, loadMode: exercise.loadMode,
         weight: exercise.type === 'strength' ? topStrengthSet?.weight ?? 0 : 0,
@@ -579,8 +602,12 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
         completedSets: completed.map(({ weight, reps, durationSeconds, durationMinutes, distanceKm, calories }) => ({
           weight, reps, durationSeconds, durationMinutes, distanceKm, calories,
         })),
-        estimated: false,
-      }] : [];
+        estimated: false, profileSnapshot: { ...data.profile }, standardsVersion: STRENGTH_STANDARD_VERSION,
+        estimatedOneRepMax: rawEstimate,
+        achievedLevel: null,
+      };
+      const grade = strengthLevelForActiveExercise(exercise, [baseRecord], data.levelResetAt, data.profile);
+      return [{ ...baseRecord, achievedLevel: grade?.index ?? null, estimatedOneRepMax: grade?.estimatedOneRepMax ?? rawEstimate }];
     });
     updateData((current) => {
       const replacedSessionIds = active.retake ? new Set(current.workouts
@@ -836,14 +863,14 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
       <section className="main-panel">
         {syncState === 'error' && <button className="sync-error-banner" onClick={() => enqueueSave(latestData.current, latestDirtyRevision.current, [...scopeRevisions.current.keys()])}><Database size={15} /> Save needs attention. Tap to retry.</button>}
         <header className="topbar"><div><span className="eyebrow">{heading.eyebrow}</span><h1>{heading.title}</h1></div><button className={`icon-button ${view === 'calendar' ? 'active' : ''}`} aria-label="Open calendar" onClick={() => navigate('calendar')}><CalendarDays size={20} /></button></header>
-        {view === 'today' && <Dashboard plan={todayPlan} dayPlans={data.dayPlans} scheduledDay={todayPlanDay} defaultDay={todayDay} meals={todayMeals} workouts={data.workouts} exerciseHistory={data.exerciseHistory} levelResetAt={data.levelResetAt} active={active} completedToday={completedToday} schedulePlan={(planDay) => schedulePlan(todayKey, planDay)} openWorkout={startOrResumeWorkout} openMeals={() => { setSelectedMealDate(todayKey); openNewMeal('date'); }} openLibrary={() => { setSelectedPlanDay(todayPlanDay >= 0 ? todayPlanDay : todayDay); setLibraryOpen(true); }} navigate={navigate} latestWorkout={data.workouts[0]} />}
+        {view === 'today' && <Dashboard plan={todayPlan} dayPlans={data.dayPlans} scheduledDay={todayPlanDay} defaultDay={todayDay} meals={todayMeals} workouts={data.workouts} exerciseHistory={data.exerciseHistory} levelResetAt={data.levelResetAt} profile={data.profile} active={active} completedToday={completedToday} schedulePlan={(planDay) => schedulePlan(todayKey, planDay)} openWorkout={startOrResumeWorkout} openMeals={() => { setSelectedMealDate(todayKey); openNewMeal('date'); }} openLibrary={() => { setSelectedPlanDay(todayPlanDay >= 0 ? todayPlanDay : todayDay); setLibraryOpen(true); }} navigate={navigate} latestWorkout={data.workouts[0]} />}
         {view === 'history' && <HistoryView workouts={data.workouts} exerciseHistory={data.exerciseHistory} dayPlans={data.dayPlans} totalVolume={historyVolume} now={clock} goToday={() => navigate('today')} editWorkout={setEditingWorkout} deleteWorkout={deleteWorkout} downloadHistory={downloadHistory} historyHasMore={historyPage.hasMore} historyLoading={historyLoading || syncState !== 'synced'} loadOlderHistory={loadOlderHistory} />}
         {view === 'meals' && <MealsView todayKey={todayKey} selectedDate={selectedMealDate} meals={selectedMeals} toggleMeal={toggleMeal} addMeal={openNewMeal} editMeal={editMeal} deleteMeal={deleteMeal} openCalendar={() => navigate('calendar')} scanLabel={scanNutritionLabel} nutritionState={nutritionState} nutritionError={nutritionError} />}
         {view === 'calendar' && <CalendarView todayKey={todayKey} selectedDate={selectedMealDate} selectDate={(date) => setSelectedMealDate(date)} workouts={data.workouts} meals={data.meals} dayPlans={data.dayPlans} datePlanOverrides={data.datePlanOverrides} schedulePlan={schedulePlan} openMeals={() => navigate('meals')} />}
-        {view === 'settings' && <SettingsView user={user} reset={resetMyData} signOutUser={signOutUser} isAdmin={isAdmin} clearLocalHistory={() => setData((current) => ({ ...current, workouts: [], exerciseHistory: [], activeWorkout: null }))} />}
+        {view === 'settings' && <SettingsView user={user} profile={data.profile} saveProfile={saveStrengthProfile} reset={resetMyData} signOutUser={signOutUser} isAdmin={isAdmin} clearLocalHistory={() => setData((current) => ({ ...current, workouts: [], exerciseHistory: [], activeWorkout: null }))} />}
       </section>
       <MobileNav view={view} navigate={navigate} />
-      {workoutOpen && active && <WorkoutModal workout={active} exerciseHistory={data.exerciseHistory} levelExercises={data.dayPlans.find((plan) => plan.day === active.planDay)?.exercises ?? []} levelResetAt={data.levelResetAt} finishedSets={finishedSets} totalSets={allSets.length} totalVolume={totalVolume} cardioMinutes={cardioMinutes} updateSet={updateSet} addSet={addSet} deleteSet={deleteSet} updateRestTimer={updateRestTimer} close={() => setWorkoutOpen(false)} discard={discardWorkout} complete={completeWorkout} />}
+      {workoutOpen && active && <WorkoutModal workout={active} exerciseHistory={data.exerciseHistory} levelExercises={data.dayPlans.find((plan) => plan.day === active.planDay)?.exercises ?? []} levelResetAt={data.levelResetAt} profile={data.profile} finishedSets={finishedSets} totalSets={allSets.length} totalVolume={totalVolume} cardioMinutes={cardioMinutes} updateSet={updateSet} addSet={addSet} deleteSet={deleteSet} updateRestTimer={updateRestTimer} updateExerciseLoadMode={updateExerciseLoadMode} close={() => setWorkoutOpen(false)} discard={discardWorkout} complete={completeWorkout} />}
       {mealOpen && <MealModal date={selectedMealDate} draft={mealDraft} meal={editingMeal} scope={mealScope} close={() => { setMealOpen(false); setMealDraft(null); setEditingMeal(null); }} submit={saveMeal} />}
       {libraryOpen && <ExerciseLibraryModal plans={data.dayPlans} selectedDay={selectedPlanDay} setSelectedDay={setSelectedPlanDay} todayDay={todayDay} close={() => setLibraryOpen(false)} updatePlan={updatePlan} add={addExercise} update={updateExercise} remove={removeExercise} />}
       {editingWorkout && <HistorySessionModal workout={editingWorkout} records={data.exerciseHistory.filter((record) => record.sessionId === editingWorkout.id)} close={() => setEditingWorkout(null)} save={saveWorkoutCorrection} />}

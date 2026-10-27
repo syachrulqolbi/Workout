@@ -85,6 +85,7 @@ export function mergeWorkoutDataScopes(base: WorkoutData, server: WorkoutData, l
   if (selected.has('plans')) {
     mergeField('dayPlans');
     mergeField('levelResetAt');
+    mergeField('standardsVersion');
   }
   if (selected.has('schedule')) mergeField('datePlanOverrides');
   if (selected.has('history')) {
@@ -92,6 +93,7 @@ export function mergeWorkoutDataScopes(base: WorkoutData, server: WorkoutData, l
     mergeField('exerciseHistory');
   }
   if (selected.has('meals')) mergeField('meals');
+  if (selected.has('profile')) mergeField('profile');
 
   return { data: normalizeWorkoutData(next), conflicts };
 }

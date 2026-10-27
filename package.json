@@ -13,7 +13,8 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "migrate:strength-v2": "node --experimental-strip-types --loader ./scripts/typescript-alias-loader.mjs ./scripts/migrate-strength-standards-v2.ts"
   },
   "dependencies": {
     "@fontsource/poppins": "^5.2.6",

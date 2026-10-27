@@ -1,11 +1,12 @@
 'use client';
 
-import { LogOut, RotateCcw, Search, ShieldCheck, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { LogOut, RotateCcw, Save, Search, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import type { AppUser } from '@/lib/auth-user';
 import { authenticatedFetch } from '@/lib/client/authenticated-fetch';
 import { accountInitials, formatDate } from '@/lib/workout-ui';
 import { NotificationSettings } from '@/features/workout/components/notification-settings';
+import type { StrengthProfile } from '@/lib/workout-data';
 
 type AdminUser = {
   uid: string;
@@ -21,14 +22,47 @@ type AdminUser = {
   activeWorkout: boolean;
 };
 
-export function SettingsView({ user, reset, signOutUser, isAdmin, clearLocalHistory }: {
+export function SettingsView({ user, profile, saveProfile, reset, signOutUser, isAdmin, clearLocalHistory }: {
   user: AppUser;
+  profile: StrengthProfile;
+  saveProfile: (profile: StrengthProfile) => void;
   reset: () => void;
   signOutUser: () => void;
   isAdmin: boolean;
   clearLocalHistory: () => void;
 }) {
-  return <div className="settings-grid"><section className="card account-card"><span className="avatar large">{accountInitials(user.displayName, user.email)}</span><div><span className="muted-label">SIGNED IN WITH GOOGLE</span><h2>{user.displayName || 'Workout user'}</h2><p>{user.email}</p></div><button className="secondary-button inline" onClick={signOutUser}><LogOut size={16} /> Sign out</button></section><NotificationSettings /><section className="card privacy-card"><ShieldCheck size={24} /><div><span className="muted-label">PRIVATE BY ACCOUNT</span><h3>Your data belongs to this Google account.</h3><p>The server verifies your protected account session on every read and write. Workout data is automatically deleted after 30 days without account activity.</p></div></section><section className="card danger-card"><div><span className="muted-label">RESET MY DATA</span><h3>Set everything back to zero</h3><p>Clear workout history, exercise progress, meal plans, weekday exercise plans and any active workout. This cannot be undone.</p></div><button className="danger-button" onClick={reset}><RotateCcw size={16} /> Reset everything</button></section>{isAdmin && <section className="admin-settings"><div className="admin-section-heading"><span className="admin-shield"><ShieldCheck size={19} /></span><div><span className="muted-label">VERIFIED ADMINISTRATOR</span><h2>User data summary</h2><p>Server-authorized access for {user.email}</p></div></div><AdminView user={user} clearLocalHistory={clearLocalHistory} /></section>}</div>;
+  return <div className="settings-grid"><section className="card account-card"><span className="avatar large">{accountInitials(user.displayName, user.email)}</span><div><span className="muted-label">SIGNED IN WITH GOOGLE</span><h2>{user.displayName || 'Workout user'}</h2><p>{user.email}</p></div><button className="secondary-button inline" onClick={signOutUser}><LogOut size={16} /> Sign out</button></section><ProfileSettings profile={profile} save={saveProfile} /><NotificationSettings /><section className="card privacy-card"><ShieldCheck size={24} /><div><span className="muted-label">PRIVATE BY ACCOUNT</span><h3>Your data belongs to this Google account.</h3><p>The server verifies your protected account session on every read and write. Workout data is automatically deleted after 30 days without account activity.</p></div></section><section className="card danger-card"><div><span className="muted-label">RESET MY DATA</span><h3>Set everything back to zero</h3><p>Clear workout history, exercise progress, meal plans, weekday exercise plans and any active workout. This cannot be undone.</p></div><button className="danger-button" onClick={reset}><RotateCcw size={16} /> Reset everything</button></section>{isAdmin && <section className="admin-settings"><div className="admin-section-heading"><span className="admin-shield"><ShieldCheck size={19} /></span><div><span className="muted-label">VERIFIED ADMINISTRATOR</span><h2>User data summary</h2><p>Server-authorized access for {user.email}</p></div></div><AdminView user={user} clearLocalHistory={clearLocalHistory} /></section>}</div>;
+}
+
+function ProfileSettings({ profile, save }: { profile: StrengthProfile; save: (profile: StrengthProfile) => void }) {
+  const [bodyweight, setBodyweight] = useState(profile.bodyweightKg?.toString() ?? '');
+  const [age, setAge] = useState(profile.ageYears?.toString() ?? '');
+  const [dateOfBirth, setDateOfBirth] = useState(profile.dateOfBirth);
+  const [message, setMessage] = useState('');
+
+  function updateDateOfBirth(value: string) {
+    setDateOfBirth(value);
+    const birth = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(birth.getTime()) || birth > new Date()) return;
+    const today = new Date();
+    let years = today.getFullYear() - birth.getFullYear();
+    if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) years -= 1;
+    if (years >= 10 && years <= 120) setAge(String(years));
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const bodyweightKg = Number(bodyweight);
+    const ageYears = Number(age);
+    if (!Number.isFinite(bodyweightKg) || bodyweightKg <= 0 || bodyweightKg > 500 || !Number.isFinite(ageYears) || ageYears < 10 || ageYears > 120) {
+      setMessage('Enter a valid bodyweight and an age from 10 to 120.');
+      return;
+    }
+    save({ bodyweightKg, ageYears: Math.round(ageYears), dateOfBirth, updatedAt: new Date().toISOString() });
+    setMessage('Saved. All level recommendations have been recalculated.');
+  }
+
+  return <section className="card profile-settings-card"><div className="section-heading"><div><span className="muted-label">STRENGTH PROFILE</span><h3>Personalized benchmarks</h3><p>Used only to recalculate level thresholds. Logged workout values never change.</p></div><span className="muscle-heading-icon"><UserRound size={19} /></span></div><form className="profile-settings-form" onSubmit={submit}><label><span>BODYWEIGHT KG</span><input inputMode="decimal" type="number" min="1" max="500" step="0.1" value={bodyweight} onChange={(event) => setBodyweight(event.target.value)} placeholder="Set bodyweight" /></label><label><span>AGE YEARS</span><input inputMode="numeric" type="number" min="10" max="120" step="1" value={age} onChange={(event) => setAge(event.target.value)} placeholder="Set age" /></label><label><span>DATE OF BIRTH <i>OPTIONAL</i></span><input type="date" value={dateOfBirth} onChange={(event) => updateDateOfBirth(event.target.value)} /></label><button className="primary-button" type="submit"><Save size={17} /> Save strength profile</button>{message && <small role="status">{message}</small>}</form></section>;
 }
 
 function AdminView({ clearLocalHistory }: { user: AppUser; clearLocalHistory: () => void }) {

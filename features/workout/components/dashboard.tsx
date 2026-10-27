@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { ArrowRight, ChevronRight, Dumbbell, Plus, Settings2, Timer } from 'lucide-react';
 import type { View } from '@/features/workout/components/app-navigation';
 import { isLoadedBackExtension, isWeightedHoldStandard } from '@/lib/exercise-profile';
-import { DAY_NAMES, DAY_SHORT, type ActiveWorkout, type DayPlan, type ExerciseRecord, type Meal, type WorkoutSession } from '@/lib/workout-data';
+import { DAY_NAMES, DAY_SHORT, type ActiveWorkout, type DayPlan, type ExerciseRecord, type Meal, type StrengthProfile, type WorkoutSession } from '@/lib/workout-data';
 import { mealNutritionOverview, mondayIndex, weeklyWorkoutMinutes } from '@/lib/workout-ui';
 
 const MuscleVisualization = dynamic(() => import('@/features/workout/components/muscle-visualization').then((module) => module.MuscleVisualization));
@@ -18,6 +18,7 @@ type DashboardProps = {
   workouts: WorkoutSession[];
   exerciseHistory: ExerciseRecord[];
   levelResetAt: string;
+  profile: StrengthProfile;
   active: ActiveWorkout | null;
   completedToday: boolean;
   schedulePlan: (planDay: number) => void;
@@ -28,7 +29,7 @@ type DashboardProps = {
   latestWorkout?: WorkoutSession;
 };
 
-export function Dashboard({ plan, dayPlans, scheduledDay, defaultDay, meals, workouts, exerciseHistory, levelResetAt, active, completedToday, schedulePlan, openWorkout, openMeals, openLibrary, navigate, latestWorkout }: DashboardProps) {
+export function Dashboard({ plan, dayPlans, scheduledDay, defaultDay, meals, workouts, exerciseHistory, levelResetAt, profile, active, completedToday, schedulePlan, openWorkout, openMeals, openLibrary, navigate, latestWorkout }: DashboardProps) {
   const button = active ? 'Resume workout' : completedToday ? 'Retake today' : plan.exercises.length ? 'Start workout' : scheduledDay === -1 ? 'Choose a plan above' : 'Edit weekly plan';
   const plannedMinutes = plan.exercises.filter((exercise) => exercise.type === 'cardio').reduce((sum, exercise) => sum + exercise.durationMinutes * exercise.sets, 0);
   const plannedSets = plan.exercises.filter((exercise) => exercise.type === 'strength').reduce((sum, exercise) => sum + exercise.sets, 0);
@@ -47,6 +48,7 @@ export function Dashboard({ plan, dayPlans, scheduledDay, defaultDay, meals, wor
 
   return (
     <div className="dashboard-grid">
+      {(!profile.bodyweightKg || !profile.ageYears) && <button className="profile-prompt" onClick={() => navigate('settings')}><span><strong>Set bodyweight and age</strong><small>Personalize L1–L10 working-weight recommendations. Baseline benchmarks are shown until then.</small></span><ArrowRight size={18} /></button>}
       <section className="workout-hero today-outline">
         <div className="hero-topline">
           <span className="pill dark">TODAY</span>
@@ -86,7 +88,7 @@ export function Dashboard({ plan, dayPlans, scheduledDay, defaultDay, meals, wor
         {plan.exercises.length ? <div className="exercise-list">{plan.exercises.map((exercise, index) => <div className="exercise-row" key={`${exercise.id}:${index}`}><span className="exercise-index">{String(index + 1).padStart(2, '0')}</span><div><strong>{exercise.name}</strong><span>{exercise.type === 'cardio' ? `${exercise.durationMinutes} min${exercise.distanceKm ? ` · ${exercise.distanceKm} km` : ''}` : exercise.measurement === 'duration' ? `${exercise.sets} sets · ${isWeightedHoldStandard(exercise.levelStandard) ? `${exercise.weight ? `+${exercise.weight} kg added` : 'bodyweight'} · ` : ''}${exercise.durationSeconds} sec` : `${exercise.sets} sets · ${exercise.reps} reps · ${exercise.loadMode === 'bodyweight' ? 'bodyweight' : exercise.loadMode === 'assistance' ? `${exercise.weight} kg assistance` : isLoadedBackExtension(exercise) ? exercise.weight ? `+${exercise.weight} kg added` : 'bodyweight' : `${exercise.weight} kg`}`}</span></div>{exercise.type === 'cardio' && <b>CARDIO</b>}<ChevronRight size={16} /></div>)}</div> : <div className="library-empty-inline"><Dumbbell size={22} /><span>No exercises for today.</span><button onClick={openLibrary}>Build today’s plan</button></div>}
       </section>
 
-      <MuscleVisualization plans={dayPlans} history={exerciseHistory} resetAt={levelResetAt} />
+      <MuscleVisualization plans={dayPlans} history={exerciseHistory} resetAt={levelResetAt} profile={profile} />
 
       <section className="quote-card"><Dumbbell size={19} /><p>Every completed set becomes part of your private training history.</p><span>{latestWorkout ? `LAST · ${latestWorkout.name.toUpperCase()}` : 'YOUR FIRST SESSION IS READY'}</span></section>
     </div>

@@ -1,12 +1,32 @@
+import { strengthStandardForExercise } from '@/lib/strength-standards';
+import { stableExerciseId } from '@/lib/workout-schema.mjs';
+
 export type ExerciseType = 'strength' | 'cardio';
 export type ExerciseMeasurement = 'reps' | 'duration' | 'distance';
 export type ExerciseLoadMode = 'total' | 'perSide' | 'assistance' | 'bodyweight' | 'duration';
 export type ExerciseLevelMetric = 'weight' | 'reps' | 'seconds' | 'assistanceEquivalent' | 'weightedHold';
+export type ExerciseMatchQuality = 'exact' | 'similar' | 'proxy' | 'custom' | 'cardio';
+export type ExerciseLoadRepresentation = 'total' | 'perDumbbell' | 'perSide' | 'addedWeight' | 'assisted' | 'bodyweight' | 'timed';
+export type StrengthProfile = {
+  bodyweightKg: number | null;
+  ageYears: number | null;
+  dateOfBirth: string;
+  updatedAt: string;
+};
 export type ExerciseLevelStandard = {
   thresholds: number[];
   metric: ExerciseLevelMetric;
   unit: 'kg' | 'reps' | 'sec' | 'level';
   holdSeconds?: number[];
+  version?: string;
+  source?: 'NEW_STRENGTH_LEVEL_MAPPING' | 'LEGACY_STANDARD_FALLBACK' | 'APPROXIMATE_PROXY' | 'CUSTOM_PROGRESSION' | 'NO_NUMERIC_STANDARD';
+  url?: string;
+  slug?: string;
+  matchQuality?: ExerciseMatchQuality;
+  note?: string;
+  loadRepresentation?: ExerciseLoadRepresentation;
+  bodyweightReference?: Array<{ input: number; thresholds: number[] }>;
+  ageReference?: Array<{ input: number; thresholds: number[] }>;
 };
 
 export type CompletedSetRecord = {
@@ -52,6 +72,10 @@ export type ExerciseRecord = {
   calories: number;
   completedSets: CompletedSetRecord[];
   estimated: boolean;
+  profileSnapshot?: StrengthProfile;
+  standardsVersion?: string;
+  estimatedOneRepMax?: number | null;
+  achievedLevel?: number | null;
 };
 
 export type SetEntry = {
@@ -78,6 +102,8 @@ export type ExerciseEntry = {
   targetDistanceKm: number;
   restSeconds: number;
   category?: string;
+  repRangeMin?: number;
+  repRangeMax?: number;
   levelStandard?: ExerciseLevelStandard | null;
   sets: SetEntry[];
 };
@@ -97,6 +123,8 @@ export type LibraryExercise = {
   restSeconds: number;
   category?: string;
   priority?: boolean;
+  repRangeMin?: number;
+  repRangeMax?: number;
   levelStandard?: ExerciseLevelStandard | null;
 };
 export type DayPlan = { day: number; name: string; focus: string; estimatedTime?: string; exercises: LibraryExercise[] };
@@ -145,6 +173,8 @@ export type WorkoutData = {
   meals: Meal[];
   activeWorkout: ActiveWorkout | null;
   levelResetAt: string;
+  profile: StrengthProfile;
+  standardsVersion: string;
 };
 
 export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -221,13 +251,15 @@ export function createDefaultDayPlans(): DayPlan[] {
 }
 
 export function createDefaultWorkoutData(): WorkoutData {
-  return { workouts: [], exerciseHistory: [], dayPlans: createDefaultDayPlans(), datePlanOverrides: {}, meals: [], activeWorkout: null, levelResetAt: '' };
+  return { workouts: [], exerciseHistory: [], dayPlans: createDefaultDayPlans(), datePlanOverrides: {}, meals: [], activeWorkout: null, levelResetAt: '', profile: { bodyweightKg: null, ageYears: null, dateOfBirth: '', updatedAt: '' }, standardsVersion: '' };
 }
 
 export function createEmptyWorkoutData(): WorkoutData {
   return {
     workouts: [], exerciseHistory: [], datePlanOverrides: {}, meals: [], activeWorkout: null,
     dayPlans: DAY_NAMES.map((_, day) => ({ day, name: 'Rest day', focus: 'Add exercises to build this day', exercises: [] })), levelResetAt: '',
+    profile: { bodyweightKg: null, ageYears: null, dateOfBirth: '', updatedAt: '' },
+    standardsVersion: '',
   };
 }
 
@@ -344,11 +376,34 @@ function normalizeLevelStandard(value: unknown): ExerciseLevelStandard | undefin
   const validUnit = unit === 'kg' || unit === 'reps' || unit === 'sec' || unit === 'level';
   if (thresholds.length !== 10 || !validMetric || !validUnit) return undefined;
   if (metric === 'weightedHold' && holdSeconds.length !== 10) return undefined;
+  const normalizeReference = (input: unknown) => (Array.isArray(input) ? input : []).flatMap((value) => {
+    const point = record(value);
+    const inputValue = Number(point.input);
+    const pointThresholds = Array.isArray(point.thresholds) ? point.thresholds.map(Number) : [];
+    return Number.isFinite(inputValue) && pointThresholds.length === 10 && pointThresholds.every(Number.isFinite)
+      ? [{ input: inputValue, thresholds: pointThresholds }] : [];
+  });
+  const matchQuality = standard.matchQuality;
+  const loadRepresentation = standard.loadRepresentation;
+  const source = standard.source;
   return {
     thresholds,
     metric,
     unit,
     ...(metric === 'weightedHold' ? { holdSeconds } : {}),
+    version: String(standard.version ?? ''),
+    source: source === 'NEW_STRENGTH_LEVEL_MAPPING' || source === 'LEGACY_STANDARD_FALLBACK'
+      || source === 'APPROXIMATE_PROXY' || source === 'CUSTOM_PROGRESSION' || source === 'NO_NUMERIC_STANDARD' ? source : undefined,
+    url: /^https:\/\/strengthlevel\.com\/strength-standards\/[a-z0-9-]+(?:\/kg)?$/.test(String(standard.url ?? '')) ? String(standard.url) : undefined,
+    slug: String(standard.slug ?? ''),
+    matchQuality: matchQuality === 'exact' || matchQuality === 'similar' || matchQuality === 'proxy'
+      || matchQuality === 'custom' || matchQuality === 'cardio' ? matchQuality : undefined,
+    note: String(standard.note ?? ''),
+    loadRepresentation: loadRepresentation === 'total' || loadRepresentation === 'perDumbbell'
+      || loadRepresentation === 'perSide' || loadRepresentation === 'addedWeight' || loadRepresentation === 'assisted'
+      || loadRepresentation === 'bodyweight' || loadRepresentation === 'timed' ? loadRepresentation : undefined,
+    bodyweightReference: normalizeReference(standard.bodyweightReference),
+    ageReference: normalizeReference(standard.ageReference),
   } as ExerciseLevelStandard;
 }
 
@@ -362,16 +417,21 @@ function normalizeLibraryExercise(value: unknown, fallbackId: string): LibraryEx
   const durationSeconds = nonNegative(item.durationSeconds, legacyTimedSeconds, 86_400);
   const weight = nonNegative(item.weight);
   const sets = Math.min(100, Math.max(1, Math.round(number(item.sets, type === 'strength' ? 3 : 1))));
-  const levelStandard = item.levelStandard === null ? null : normalizeLevelStandard(item.levelStandard);
+  const exerciseId = storedExerciseId(item.id ?? fallbackId, name);
+  const legacyLevelStandard = item.levelStandard === null ? null : normalizeLevelStandard(item.levelStandard);
+  const levelStandard = type === 'cardio' ? null : strengthStandardForExercise(exerciseId, name, legacyLevelStandard);
   return {
-    id: storedExerciseId(item.id ?? fallbackId, name), name, type, measurement,
+    id: exerciseId, name, type, measurement,
     loadMode: exerciseLoadMode(item.loadMode, type, measurement, name, weight),
     weight, reps: measurement === 'reps' ? nonNegative(item.reps, type === 'strength' ? 8 : 0, 10_000) : 0,
     sets, durationSeconds,
     durationMinutes: nonNegative(item.durationMinutes, type === 'cardio' ? nonNegative(item.reps, 20) : 0, 10_000),
     distanceKm, calories: nonNegative(item.calories, 0, 100_000),
     restSeconds: type === 'cardio' && sets <= 1 ? 0 : nonNegative(item.restSeconds, type === 'strength' ? 90 : 0, 3_600),
-    category: String(item.category ?? ''), priority: Boolean(item.priority), levelStandard,
+    category: String(item.category ?? ''), priority: Boolean(item.priority),
+    repRangeMin: measurement === 'reps' ? nonNegative(item.repRangeMin, nonNegative(item.reps, type === 'strength' ? 8 : 0), 10_000) : 0,
+    repRangeMax: measurement === 'reps' ? nonNegative(item.repRangeMax, nonNegative(item.reps, type === 'strength' ? 8 : 0), 10_000) : 0,
+    levelStandard,
   };
 }
 
@@ -450,6 +510,10 @@ export function normalizeWorkoutData(value: unknown): WorkoutData {
       targetMet: Boolean(item.targetMet),
       durationSeconds, durationMinutes: nonNegative(item.durationMinutes, 0, 100_000), distanceKm, calories: nonNegative(item.calories, 0, 10_000_000),
       completedSets, estimated: item.estimated === undefined ? !storedCompletedSets.length : Boolean(item.estimated),
+      profileSnapshot: item.profileSnapshot ? normalizeStrengthProfile(item.profileSnapshot) : undefined,
+      standardsVersion: String(item.standardsVersion ?? ''),
+      estimatedOneRepMax: item.estimatedOneRepMax === null || item.estimatedOneRepMax === undefined ? null : nonNegative(item.estimatedOneRepMax),
+      achievedLevel: item.achievedLevel === null || item.achievedLevel === undefined ? null : Math.min(10, Math.max(0, Math.round(number(item.achievedLevel)))),
     };
   });
 
@@ -490,8 +554,10 @@ export function normalizeWorkoutData(value: unknown): WorkoutData {
       const measurement = exerciseMeasurement(item.measurement, type, name, distanceKm);
       const weight = nonNegative(item.targetWeight, nonNegative(record((Array.isArray(item.sets) ? item.sets : [])[0]).weight));
       const sets = Array.isArray(item.sets) ? item.sets : [];
+      const exerciseId = storedExerciseId(item.id, name);
+      const legacyLevelStandard = item.levelStandard === null ? null : normalizeLevelStandard(item.levelStandard);
       return {
-        id: storedExerciseId(item.id, name), name, type, measurement,
+        id: exerciseId, name, type, measurement,
         loadMode: exerciseLoadMode(item.loadMode, type, measurement, name, weight), targetWeight: weight,
         targetReps: measurement === 'reps' ? nonNegative(item.targetReps, nonNegative(record((Array.isArray(item.sets) ? item.sets : [])[0]).reps, type === 'strength' ? 8 : 0), 10_000) : 0,
         targetDurationSeconds: nonNegative(item.targetDurationSeconds, nonNegative(record(sets[0]).durationSeconds,
@@ -500,7 +566,9 @@ export function normalizeWorkoutData(value: unknown): WorkoutData {
         targetDistanceKm: distanceKm,
         restSeconds: type === 'cardio' && sets.length <= 1 ? 0 : nonNegative(item.restSeconds, type === 'strength' ? 90 : 0, 3_600),
         category: String(item.category ?? ''),
-        levelStandard: item.levelStandard === null ? null : normalizeLevelStandard(item.levelStandard),
+        repRangeMin: measurement === 'reps' ? nonNegative(item.repRangeMin, nonNegative(item.targetReps, 8), 10_000) : 0,
+        repRangeMax: measurement === 'reps' ? nonNegative(item.repRangeMax, nonNegative(item.targetReps, 8), 10_000) : 0,
+        levelStandard: type === 'cardio' ? null : strengthStandardForExercise(exerciseId, name, legacyLevelStandard),
         sets: sets.map((set, setIndex) => {
           const normalized = normalizeSet(set, `active-${exerciseIndex}-${setIndex}`);
           return type === 'strength' && measurement === 'duration' && !normalized.durationSeconds
@@ -511,8 +579,26 @@ export function normalizeWorkoutData(value: unknown): WorkoutData {
     }),
   } : null;
 
-  return { workouts, exerciseHistory, dayPlans, datePlanOverrides, meals, activeWorkout, levelResetAt: String(legacy.levelResetAt ?? '') };
+  return { workouts, exerciseHistory, dayPlans, datePlanOverrides, meals, activeWorkout, levelResetAt: String(legacy.levelResetAt ?? ''), profile: normalizeStrengthProfile(legacy.profile), standardsVersion: String(legacy.standardsVersion ?? '') };
 }
-import { stableExerciseId } from '@/lib/workout-schema.mjs';
 
+function normalizeStrengthProfile(value: unknown): StrengthProfile {
+  const profile = record(value);
+  const bodyweight = Number(profile.bodyweightKg);
+  const age = Number(profile.ageYears);
+  const dateOfBirth = /^\d{4}-\d{2}-\d{2}$/.test(String(profile.dateOfBirth ?? '')) ? String(profile.dateOfBirth) : '';
+  const birth = dateOfBirth ? new Date(`${dateOfBirth}T12:00:00Z`) : null;
+  const today = new Date();
+  let derivedAge: number | null = null;
+  if (birth && !Number.isNaN(birth.getTime()) && birth <= today) {
+    derivedAge = today.getUTCFullYear() - birth.getUTCFullYear();
+    if (today.getUTCMonth() < birth.getUTCMonth() || (today.getUTCMonth() === birth.getUTCMonth() && today.getUTCDate() < birth.getUTCDate())) derivedAge -= 1;
+  }
+  return {
+    bodyweightKg: Number.isFinite(bodyweight) && bodyweight > 0 && bodyweight <= 500 ? bodyweight : null,
+    ageYears: Number.isFinite(age) && age >= 10 && age <= 120 ? Math.round(age) : derivedAge && derivedAge >= 10 && derivedAge <= 120 ? derivedAge : null,
+    dateOfBirth,
+    updatedAt: String(profile.updatedAt ?? ''),
+  };
+}
 export { stableExerciseId } from '@/lib/workout-schema.mjs';

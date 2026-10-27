@@ -1,7 +1,11 @@
 import {
   stableExerciseId, type ExerciseEntry, type ExerciseLevelMetric, type ExerciseLevelStandard,
-  type ExerciseLoadMode, type ExerciseRecord, type LibraryExercise,
+  type ExerciseLoadMode, type ExerciseRecord, type LibraryExercise, type StrengthProfile,
 } from '@/lib/workout-data';
+import {
+  estimatedOneRepMax, levelForThresholds, personalizedThresholds, pullUpEstimatedAddedWeightOneRepMax,
+  requiredWorkingWeight,
+} from '@/lib/strength-calculations';
 import { levelIndexForThresholds } from '@/lib/workout-schema.mjs';
 
 export type MuscleGroup =
@@ -179,6 +183,13 @@ export type StrengthLevel = {
   milestones?: Array<{ weight: number; seconds: number }>;
   bestWeight?: number;
   bestSeconds?: number;
+  estimatedOneRepMax?: number | null;
+  baselineThresholds?: number[];
+  personalizedThresholds?: number[];
+  targetWorkingWeights?: Array<number | null>;
+  targetReps?: number;
+  approximate?: boolean;
+  personalizationLabel?: string;
 };
 
 function explicitLevelRanges(thresholds: number[]) {
@@ -227,7 +238,96 @@ export function exerciseHistoryKeys({ name, id = '' }: { name: string; id?: stri
   return [...new Set([id, stableExerciseId(name), stableExerciseId(canonicalExerciseName(name))].filter(Boolean))];
 }
 
-export function createStrengthLevelResolver(history: ExerciseRecord[], resetAt = '') {
+function normalizeStandardLoad(weight: number, loadMode: ExerciseLoadMode, standard: ExerciseLevelStandard) {
+  if (standard.loadRepresentation === 'perDumbbell' && loadMode === 'total') return weight / 2;
+  if (standard.loadRepresentation === 'total' && loadMode === 'perSide') return weight * 2;
+  return weight;
+}
+
+function strengthLevelForV2(
+  exercise: LibraryExercise,
+  matches: ExerciseRecord[],
+  profile?: StrengthProfile | null,
+): StrengthLevel | null {
+  const standard = exercise.levelStandard;
+  if (!standard || standard.thresholds.length !== 10) return null;
+  if (standard.metric === 'weightedHold' && standard.holdSeconds?.length === 10) {
+    const performances = matches.flatMap((record) => record.completedSets.length
+      ? record.completedSets.map((set) => ({ weight: set.weight, durationSeconds: set.durationSeconds }))
+      : [{ weight: record.weight, durationSeconds: record.setsCompleted ? record.durationSeconds / record.setsCompleted : record.durationSeconds }]);
+    const planPerformance = { weight: exercise.weight, durationSeconds: exercise.durationSeconds };
+    const best = bestWeightedHoldPerformance(standard, [planPerformance, ...performances]) ?? planPerformance;
+    const index = weightedHoldLevel(standard, best.weight, best.durationSeconds);
+    const milestones = standard.thresholds.map((weight, milestoneIndex) => ({ weight, seconds: standard.holdSeconds![milestoneIndex] }));
+    return {
+      index, ...STRENGTH_LEVELS[index - 1], load: index, rangeMin: index, rangeMax: index,
+      isAssistance: false, hasHistory: performances.length > 0, loadMode: exercise.loadMode,
+      metric: standard.metric, unit: standard.unit, ranges: milestones.map((_, milestoneIndex) => ({ min: milestoneIndex + 1, max: milestoneIndex + 1 })),
+      milestones, bestWeight: rounded(best.weight), bestSeconds: rounded(best.durationSeconds),
+      baselineThresholds: [...standard.thresholds], personalizedThresholds: [...standard.thresholds], approximate: true,
+      personalizationLabel: 'Custom timed progression',
+    };
+  }
+
+  const personalized = personalizedThresholds(standard, profile);
+  const targetReps = Math.max(1, exercise.reps || exercise.repRangeMax || exercise.repRangeMin || 1);
+  const customDirectLoad = standard.matchQuality === 'custom' && standard.loadRepresentation === 'addedWeight';
+  const pullUp = exercise.id === 'exercise-pull-up' || stableExerciseId(exercise.name) === 'exercise-pull-up';
+  const performanceValues: number[] = [];
+
+  const addPerformance = (weight: number, reps: number, loadMode: ExerciseLoadMode) => {
+    if (customDirectLoad) { performanceValues.push(weight); return; }
+    if (pullUp) {
+      if (profile?.bodyweightKg) {
+        const estimated = pullUpEstimatedAddedWeightOneRepMax(
+          profile.bodyweightKg,
+          loadMode === 'assistance' ? weight : 0,
+          loadMode === 'total' || loadMode === 'perSide' ? weight : 0,
+          reps,
+        );
+        if (estimated !== null) performanceValues.push(estimated);
+      } else performanceValues.push(loadMode === 'assistance' ? -weight : weight);
+      return;
+    }
+    const normalized = normalizeStandardLoad(weight, loadMode, standard);
+    const estimated = estimatedOneRepMax(normalized, reps);
+    if (estimated !== null) performanceValues.push(estimated);
+  };
+
+  for (const record of matches) {
+    if (record.completedSets.length) record.completedSets.forEach((set) => addPerformance(set.weight, set.reps, record.loadMode));
+    else addPerformance(record.weight, record.reps, record.loadMode);
+  }
+  if (!performanceValues.length) addPerformance(exercise.weight, targetReps, exercise.loadMode);
+  const performance = performanceValues.length ? Math.max(...performanceValues) : 0;
+  const rawIndex = levelForThresholds(personalized.thresholds, performance);
+  const index = Math.max(1, rawIndex);
+  const tier = rawIndex ? STRENGTH_LEVELS[index - 1] : { name: 'Below L1', color: '#eeeeee' };
+  const targetWorkingWeights = customDirectLoad
+    ? personalized.thresholds.map((threshold) => threshold)
+    : pullUp ? personalized.thresholds.map(() => null)
+      : personalized.thresholds.map((threshold) => requiredWorkingWeight(threshold, targetReps));
+  const ranges = targetWorkingWeights.map((minimum, tierIndex) => ({
+    min: minimum ?? personalized.thresholds[tierIndex],
+    max: tierIndex === 9 ? null : targetWorkingWeights[tierIndex + 1] ?? personalized.thresholds[tierIndex + 1],
+  }));
+  const personalizationLabel = personalized.personalized
+    ? `${personalized.bodyweightMethod === 'published' ? 'Published bodyweight table' : personalized.bodyweightMethod === 'allometric-proxy' ? 'Approximate bodyweight scaling' : 'No bodyweight adjustment'} · ${personalized.ageMethod === 'published' ? 'published age table' : personalized.ageMethod === 'generic-proxy' ? 'generic age curve' : 'no age adjustment'}`
+    : 'Baseline 1RM · set bodyweight and age to personalize';
+  return {
+    index: rawIndex, name: tier.name, color: tier.color, load: rounded(performance),
+    rangeMin: ranges[index - 1]?.min ?? 0, rangeMax: ranges[index - 1]?.max ?? personalized.thresholds[index - 1],
+    isAssistance: exercise.loadMode === 'assistance', hasHistory: matches.length > 0,
+    loadMode: exercise.loadMode, metric: standard.metric, unit: standard.unit, ranges,
+    isAddedWeight: standard.loadRepresentation === 'addedWeight' || pullUp,
+    estimatedOneRepMax: customDirectLoad ? null : performance,
+    baselineThresholds: [...standard.thresholds], personalizedThresholds: personalized.thresholds,
+    targetWorkingWeights, targetReps, approximate: personalized.approximate,
+    personalizationLabel: `${personalizationLabel}${personalized.referenceLimited ? ' · outside the local published table, nearest supported value used' : ''}`,
+  };
+}
+
+export function createStrengthLevelResolver(history: ExerciseRecord[], resetAt = '', profile?: StrengthProfile | null) {
   const resetTime = resetAt ? new Date(resetAt).getTime() : 0;
   const byExercise = new Map<string, ExerciseRecord[]>();
   for (const record of history) {
@@ -244,11 +344,11 @@ export function createStrengthLevelResolver(history: ExerciseRecord[], resetAt =
     for (const key of exerciseHistoryKeys(exercise)) {
       for (const record of byExercise.get(key) ?? []) matches.add(record);
     }
-    return strengthLevelForExercise(exercise, [], resetAt, [...matches]);
+    return strengthLevelForExercise(exercise, [], resetAt, [...matches], profile);
   };
 }
 
-export function strengthLevelForActiveExercise(exercise: ExerciseEntry, history: ExerciseRecord[] = [], resetAt = '') {
+export function strengthLevelForActiveExercise(exercise: ExerciseEntry, history: ExerciseRecord[] = [], resetAt = '', profile?: StrengthProfile | null) {
   return strengthLevelForExercise({
     id: exercise.id,
     name: exercise.name,
@@ -263,9 +363,9 @@ export function strengthLevelForActiveExercise(exercise: ExerciseEntry, history:
     distanceKm: exercise.targetDistanceKm,
     calories: exercise.sets[0]?.calories ?? 0,
     restSeconds: exercise.restSeconds,
-    category: exercise.category,
+    category: exercise.category, repRangeMin: exercise.repRangeMin, repRangeMax: exercise.repRangeMax,
     levelStandard: exercise.levelStandard,
-  }, history, resetAt);
+  }, history, resetAt, undefined, profile);
 }
 
 export function strengthLevelForWorkoutExercise(
@@ -273,21 +373,23 @@ export function strengthLevelForWorkoutExercise(
   planExercises: LibraryExercise[],
   history: ExerciseRecord[] = [],
   resetAt = '',
+  profile?: StrengthProfile | null,
 ) {
   const planExercise = planExercises.find((candidate) => candidate.id === exercise.id)
     ?? planExercises.find((candidate) => exerciseNamesMatch(candidate.name, exercise.name));
   return planExercise
-    ? strengthLevelForExercise(planExercise, history, resetAt)
-    : strengthLevelForActiveExercise(exercise, history, resetAt);
+    ? strengthLevelForExercise(planExercise, history, resetAt, undefined, profile)
+    : strengthLevelForActiveExercise(exercise, history, resetAt, profile);
 }
 
-export function strengthLevelForExercise(exercise: LibraryExercise, history: ExerciseRecord[], resetAt = '', indexedMatches?: ExerciseRecord[]): StrengthLevel | null {
+export function strengthLevelForExercise(exercise: LibraryExercise, history: ExerciseRecord[], resetAt = '', indexedMatches?: ExerciseRecord[], profile?: StrengthProfile | null): StrengthLevel | null {
   if (exercise.type === 'cardio') return null;
   if (exercise.levelStandard === null) return null;
   const exerciseId = exercise.id || stableExerciseId(exercise.name);
   const resetTime = resetAt ? new Date(resetAt).getTime() : 0;
   const matches = indexedMatches ?? history.filter((record) => record.type === 'strength' && (!resetTime || new Date(record.date).getTime() >= resetTime)
     && ((record.exerciseId || stableExerciseId(record.exercise)) === exerciseId || exerciseNamesMatch(record.exercise, exercise.name)));
+  if (exercise.levelStandard?.version === 'strength-standards-v2') return strengthLevelForV2(exercise, matches, profile);
   const historyLoads = matches.map((record) => record.weight).filter((weight) => Number.isFinite(weight) && weight >= 0);
   const isAssistance = exercise.loadMode === 'assistance' || /assist/i.test(exercise.name);
   const plannedLoad = Math.max(0, exercise.weight);

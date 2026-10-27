@@ -11,7 +11,7 @@ const details = process.argv.includes('--details');
 const resetLevels = process.argv.includes('--reset-levels');
 
 const levelStandards = new Map([
-  ['exercise-pull-up', { thresholds: [-50, -40, -30, -20, -10, 0, 5, 10, 20, 35], metric: 'assistanceEquivalent', unit: 'kg' }],
+  ['exercise-pull-up', { thresholds: [-3, 5, 13, 22, 31, 41.5, 52, 59, 66, 73], metric: 'weight', unit: 'kg', loadRepresentation: 'assisted' }],
   ['exercise-iso-lateral-bench-press', [34, 45, 56, 71, 86, 103.5, 121, 134.5, 147.5, 161]],
   ['exercise-iso-lateral-wide-pulldown', [42, 51, 60, 71, 82, 94.5, 107, 116, 125, 134]],
   ['exercise-iso-lateral-shoulder-press', [25, 35, 45, 59, 73, 90.5, 108, 121.5, 134.5, 148]],
@@ -19,7 +19,7 @@ const levelStandards = new Map([
   ['exercise-lateral-raise', [22, 29.5, 37, 47.5, 58, 71, 84, 93.5, 103.5, 113]],
   ['exercise-face-pull', [14, 20.5, 27, 36, 45, 56.5, 68, 77, 86, 95]],
   ['exercise-wrist-curl', [6, 12.5, 19, 30, 41, 56, 71, 83.5, 96.5, 109]],
-  ['exercise-hammer-curl', [18, 24, 30, 38, 46, 55, 64, 71.5, 78.5, 86]],
+  ['exercise-hammer-curl', { thresholds: [9, 12, 15, 19, 23, 27.5, 32, 35.75, 39.25, 43], metric: 'weight', unit: 'kg', loadRepresentation: 'perDumbbell' }],
   ['exercise-machine-ab-crunch', [26, 36, 46, 60, 74, 90.5, 107, 119.5, 132.5, 145]],
   ['exercise-seated-leg-press', [66, 88, 110, 139, 168, 203, 238, 264, 290, 316]],
   ['exercise-pendulum-x-squat', [58, 78.5, 99, 125.5, 152, 184.5, 217, 241, 265, 289]],
@@ -43,9 +43,9 @@ const levelStandards = new Map([
   ['exercise-bicep-curl', [22, 29.5, 37, 46, 55, 66.5, 78, 86.5, 94.5, 103]],
   ['exercise-tricep-press', [50, 63, 76, 92.5, 109, 128.5, 148, 162, 176, 190]],
   ['exercise-iso-lateral-high-row', [41, 54, 67, 83.5, 100, 120.5, 141, 156, 171, 186]],
-  ['exercise-iso-lateral-low-row', [41, 50.5, 60, 72, 84, 98, 112, 122, 132, 142]],
+  ['exercise-iso-lateral-low-row', [41, 54, 67, 83.5, 100, 120.5, 141, 156, 171, 186]],
   ['exercise-hi-lo-cable-chest-fly', [7, 12.5, 18, 26.5, 35, 46, 57, 66, 75, 84]],
-  ['exercise-shrugs', [28, 40, 52, 68, 84, 104, 124, 139.5, 154.5, 170]],
+  ['exercise-shrugs', { thresholds: [14, 20, 26, 34, 42, 52, 62, 69.75, 77.25, 85], metric: 'weight', unit: 'kg', loadRepresentation: 'perDumbbell' }],
   ['exercise-cable-woodchopper', [7, 13, 19, 27.5, 36, 48, 60, 69.5, 78.5, 88]],
 ]);
 
@@ -58,7 +58,7 @@ function levelStandard(name) {
 function strength({ name, category, priority = false, weight, reps, sets, restSeconds }) {
   const timed = /\b(plank|hold|wall sit)\b/i.test(name);
   const standard = levelStandard(name);
-  const assistance = (standard?.metric === 'assistanceEquivalent' && weight > 0) || /assist/i.test(name);
+  const assistance = (standard?.loadRepresentation === 'assisted' && weight > 0) || /assist/i.test(name);
   const weightedHold = standard?.metric === 'weightedHold';
   const levelOneUpperValue = standard
     ? levelUpperLimit(standard.thresholds, 1, standard.metric === 'weight' ? 0.5 : 1)
@@ -73,7 +73,7 @@ function strength({ name, category, priority = false, weight, reps, sets, restSe
     loadMode,
     weight: timed && !weightedHold ? 0 : resetWeight, reps: timed ? 0 : resetReps, sets, durationSeconds: timed ? resetSeconds : 0,
     durationMinutes: 0, distanceKm: 0, calories: 0, restSeconds,
-    category, priority, ...(standard !== undefined ? { levelStandard: standard } : {}),
+    category, priority, ...(standard !== undefined ? { levelStandard: { ...standard, version: 'strength-standards-v2' } } : {}),
   };
 }
 
@@ -98,8 +98,8 @@ const dayPlans = [
       strength({ id: 'mon-chest-fly', name: 'Chest fly machine', category: 'PUSH', prescription: '2×10–15', current: '85 total', target: '154 total', weight: 85, reps: 15, sets: 2, restSeconds: 60, restLabel: '60 sec' }),
       strength({ id: 'mon-lateral-raise', name: 'Lateral raise', category: 'PUSH', prescription: '2×12–15', current: '69 total', target: '117 total', weight: 69, reps: 15, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
       strength({ id: 'mon-face-pull', name: 'Face pull', category: 'PULL', prescription: '2×12–15', current: '47.5 total', target: '96 total', weight: 47.5, reps: 15, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
-      strength({ id: 'mon-wrist-curl', name: 'Wrist curl (A)', category: 'ARMS', prescription: '2×12–15', current: '50 total', target: '71 total', weight: 50, reps: 15, sets: 2, restSeconds: 45, restLabel: '30–45 sec' }),
-      strength({ id: 'mon-hammer-curl', name: 'Hammer curl (B)', category: 'ARMS', prescription: '2×10–12', current: '20 total', target: '50 total', weight: 20, reps: 12, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
+      strength({ id: 'mon-wrist-curl', name: 'Wrist Curl (A)', category: 'ARMS', prescription: '2×12–15', current: '50 total', target: '71 total', weight: 50, reps: 15, sets: 2, restSeconds: 45, restLabel: '30–45 sec' }),
+      strength({ id: 'mon-hammer-curl', name: 'Hammer Curl (B)', category: 'ARMS', prescription: '2×10–12', current: '20 total', target: '50 total', weight: 20, reps: 12, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
       strength({ id: 'mon-ab-crunch', name: 'Machine ab crunch', category: 'CORE', priority: true, prescription: '2×10–15', current: '42.5', target: '86.5', weight: 42.5, reps: 15, sets: 2, restSeconds: 60, restLabel: '45–60 sec' }),
       cardio('mon-incline-walk'),
     ],

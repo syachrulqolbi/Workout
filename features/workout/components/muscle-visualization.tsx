@@ -1,12 +1,13 @@
 'use client';
 
-import { Activity, ChevronDown, Dumbbell } from 'lucide-react';
+import { Activity, ChevronDown, Dumbbell, ExternalLink } from 'lucide-react';
 import { useMemo, useState, type CSSProperties } from 'react';
 import {
   MUSCLE_LABELS, STRENGTH_LEVELS, createStrengthLevelResolver, musclesForExercise, strengthLevelForExercise,
   type ExerciseMuscles, type MuscleGroup,
 } from '@/lib/exercise-profile';
-import { DAY_NAMES, type DayPlan, type ExerciseRecord, type LibraryExercise } from '@/lib/workout-data';
+import { DAY_NAMES, type DayPlan, type ExerciseRecord, type LibraryExercise, type StrengthProfile } from '@/lib/workout-data';
+import { pullUpTargetSetup, requiredWorkingWeight } from '@/lib/strength-calculations';
 
 type SummaryMuscle = { group: MuscleGroup; score: number; direct: boolean; color: string };
 
@@ -46,10 +47,10 @@ function summarizePlan(exercises: LibraryExercise[], resolveLevel: ReturnType<ty
   };
 }
 
-export function MuscleVisualization({ plans, history, resetAt }: { plans: DayPlan[]; history: ExerciseRecord[]; resetAt: string }) {
+export function MuscleVisualization({ plans, history, resetAt, profile }: { plans: DayPlan[]; history: ExerciseRecord[]; resetAt: string; profile: StrengthProfile }) {
   const planExercises = useMemo(() => plans.flatMap((plan) => plan.exercises.map((exercise) => ({ key: `${plan.day}:${exercise.id}`, day: plan.day, exercise }))), [plans]);
   const exercises = useMemo(() => planExercises.map((item) => item.exercise), [planExercises]);
-  const resolveLevel = useMemo(() => createStrengthLevelResolver(history, resetAt), [history, resetAt]);
+  const resolveLevel = useMemo(() => createStrengthLevelResolver(history, resetAt, profile), [history, resetAt, profile]);
   const levels = useMemo(() => new Map(planExercises.map((item) => [item.key, resolveLevel(item.exercise)])), [planExercises, resolveLevel]);
   const [selectedId, setSelectedId] = useState('summary');
   const selectedEntry = selectedId === 'summary' ? undefined : planExercises.find((item) => item.key === selectedId);
@@ -88,7 +89,7 @@ export function MuscleVisualization({ plans, history, resetAt }: { plans: DayPla
             </div>
 
             <div className="muscle-detail-panel">
-              {!selected ? <PlanSummaryDetail exercises={exercises} muscles={summary.muscles} averageLevel={summary.averageLevel} gradedExerciseCount={summary.gradedExerciseCount} /> : level ? <StrengthLevelDetail key={`${selectedEntry.key}:${level.index}`} level={level} /> : selected.type === 'cardio' ? <CardioDetail exercise={selected} /> : <UngradedStrengthDetail exercise={selected} />}
+              {!selected ? <PlanSummaryDetail exercises={exercises} muscles={summary.muscles} averageLevel={summary.averageLevel} gradedExerciseCount={summary.gradedExerciseCount} /> : level ? <StrengthLevelDetail key={`${selectedEntry.key}:${level.index}:${profile.bodyweightKg}:${profile.ageYears}`} level={level} exercise={selected} profile={profile} /> : selected.type === 'cardio' ? <CardioDetail exercise={selected} /> : <UngradedStrengthDetail exercise={selected} />}
               <div className="trained-groups">
                 <span className="muted-label">{selected ? 'TRAINED MUSCLES' : 'PLAN COVERAGE'}</span>
                 <div>{muscles.primary.map((group) => <b key={group}>{MUSCLE_LABELS[group]}</b>)}{muscles.secondary.map((group) => <span key={group}>{MUSCLE_LABELS[group]}</span>)}</div>
@@ -121,8 +122,10 @@ function PlanSummaryDetail({ exercises, muscles, averageLevel, gradedExerciseCou
   );
 }
 
-function StrengthLevelDetail({ level }: { level: NonNullable<ReturnType<typeof strengthLevelForExercise>> }) {
-  const [selectedIndex, setSelectedIndex] = useState(level.index);
+function StrengthLevelDetail({ level, exercise, profile }: { level: NonNullable<ReturnType<typeof strengthLevelForExercise>>; exercise: LibraryExercise; profile: StrengthProfile }) {
+  const achievedIndex = Math.max(0, level.index);
+  const [selectedIndex, setSelectedIndex] = useState(Math.max(1, achievedIndex));
+  const [targetReps, setTargetReps] = useState(Math.max(1, exercise.reps || exercise.repRangeMax || exercise.repRangeMin || 1));
   const levelNames = STRENGTH_LEVELS.map((tier) => tier.name);
   const selectedTier = { ...STRENGTH_LEVELS[selectedIndex - 1], name: levelNames[selectedIndex - 1] };
   const selectedRange = level.ranges[selectedIndex - 1] ?? { min: level.rangeMin, max: level.rangeMax };
@@ -135,7 +138,7 @@ function StrengthLevelDetail({ level }: { level: NonNullable<ReturnType<typeof s
   const loadSuffix = level.metric === 'weight' && !level.isAddedWeight ? level.isAssistance ? ' assistance' : level.loadMode === 'perSide' ? ' per side' : ' total' : '';
   const load = level.metric === 'weightedHold'
     ? formatWeightedHold(level.bestWeight ?? 0, level.bestSeconds ?? 0)
-    : `${formatMetric(level.load)}${loadSuffix}`;
+    : level.estimatedOneRepMax !== undefined ? `${formatMetric(level.load)} estimated 1RM` : `${formatMetric(level.load)}${loadSuffix}`;
   const range = selectedMilestone
     ? formatWeightedHold(selectedMilestone.weight, selectedMilestone.seconds)
     : selectedRange.max === null
@@ -145,26 +148,63 @@ function StrengthLevelDetail({ level }: { level: NonNullable<ReturnType<typeof s
       : `${formatMetric(selectedRange.min)} to under ${formatMetric(selectedRange.max)}`;
   return (
     <div className="strength-level-detail">
-      <span className="level-kicker">{selectedIndex === level.index ? 'CURRENT' : 'VIEWING'} LEVEL {selectedIndex} OF 10</span>
+      <span className="level-kicker">{selectedIndex === achievedIndex ? 'CURRENT' : 'VIEWING'} LEVEL {selectedIndex} OF 10</span>
       <div className="level-title"><h4>{selectedTier.name}</h4><span style={{ background: selectedTier.color }}>{selectedIndex}</span></div>
+      {exercise.levelStandard?.url && <a className="standard-source-link" href={exercise.levelStandard.url} target="_blank" rel="noreferrer">Strength Level reference <ExternalLink size={13} /></a>}
+      {exercise.levelStandard?.note && <p className="standard-match-note"><strong>{(exercise.levelStandard.matchQuality ?? 'custom').toUpperCase()} MATCH</strong> · {exercise.levelStandard.note}</p>}
       <div className="level-metrics">
         <div><span>{level.hasHistory ? 'BEST LOGGED' : 'PLAN LOAD'}</span><strong>{load}</strong></div>
         <div><span>LEVEL {selectedIndex} {selectedMilestone ? 'REQUIREMENT' : 'RANGE'}</span><strong>{range}</strong></div>
       </div>
-      {selectedIndex !== level.index && <div className="level-current-note">CURRENT LEVEL · <strong>L{level.index} {level.name}</strong></div>}
+      {achievedIndex === 0 && <div className="level-current-note">CURRENT RESULT · <strong>Below L1</strong></div>}
+      {achievedIndex > 0 && selectedIndex !== achievedIndex && <div className="level-current-note">CURRENT LEVEL · <strong>L{achievedIndex} {level.name}</strong></div>}
       <div className="level-scale-heading"><span>EXPLORE LEVELS</span><small>Tap a level to view its range</small></div>
       <div className="level-scale" aria-label={`Current level ${level.index} of 10, ${level.name}. Choose a level to show its range.`}>
         {STRENGTH_LEVELS.map((tier, index) => {
           const tierIndex = index + 1;
           const tierName = levelNames[index];
-          const classes = [tierIndex <= level.index ? 'reached' : '', tierIndex === level.index ? 'achieved' : '', tierIndex === selectedIndex ? 'selected' : ''].filter(Boolean).join(' ');
-          return <button key={`${tierIndex}-${tierName}`} type="button" className={classes} style={{ '--tier-color': tier.color } as CSSProperties} aria-label={`Show level ${tierIndex}, ${tierName}, range${tierIndex === level.index ? ', current level' : ''}`} aria-pressed={tierIndex === selectedIndex} onClick={() => setSelectedIndex(tierIndex)}><span>{tierIndex}</span>{tierIndex === level.index && <i aria-hidden="true" />}</button>;
+          const classes = [tierIndex <= achievedIndex ? 'reached' : '', tierIndex === achievedIndex ? 'achieved' : '', tierIndex === selectedIndex ? 'selected' : ''].filter(Boolean).join(' ');
+          return <button key={`${tierIndex}-${tierName}`} type="button" className={classes} style={{ '--tier-color': tier.color } as CSSProperties} aria-label={`Show level ${tierIndex}, ${tierName}, range${tierIndex === achievedIndex ? ', current level' : ''}`} aria-pressed={tierIndex === selectedIndex} onClick={() => setSelectedIndex(tierIndex)}><span>{tierIndex}</span>{tierIndex === achievedIndex && <i aria-hidden="true" />}</button>;
         })}
       </div>
       <div className="level-scale-labels"><span><b>L1</b> {levelNames[0]}</span><span><b>L6</b> {levelNames[5]}</span><span><b>L10</b> {levelNames[9]}</span></div>
+      {level.personalizedThresholds && level.metric === 'weight' && <PersonalizedLevelTable exercise={exercise} profile={profile} level={level} targetReps={targetReps} setTargetReps={setTargetReps} />}
+      <p className="personalization-note">{level.personalizationLabel}{level.approximate ? ' · approximate' : ''}</p>
       <p>{level.metric === 'weightedHold' ? 'Each level requires both the shown added weight and hold time. Your best completed set determines the current level.' : level.metric === 'assistanceEquivalent' ? 'Assistance is converted to an equivalent load: machine assistance is negative, while added external weight is positive.' : level.isAddedWeight ? 'Levels use only the external weight held at your chest; bodyweight is Level 1. Your best logged added load sets the level.' : level.isAssistance && level.metric === 'weight' ? 'Lower machine assistance is stronger. Your lowest logged assistance sets this level.' : level.metric === 'reps' ? 'Your best completed repetitions set this level.' : level.metric === 'seconds' ? 'Your best completed hold duration sets this level.' : level.loadMode === 'perSide' ? 'This exercise is measured per side. Personal targets do not change its level bands.' : 'Your best logged load sets the level. Personal targets are tracked separately and do not change the level bands.'}</p>
     </div>
   );
+}
+
+function PersonalizedLevelTable({ exercise, profile, level, targetReps, setTargetReps }: {
+  exercise: LibraryExercise;
+  profile: StrengthProfile;
+  level: NonNullable<ReturnType<typeof strengthLevelForExercise>>;
+  targetReps: number;
+  setTargetReps: (value: number) => void;
+}) {
+  const standard = exercise.levelStandard!;
+  const pullUp = exercise.id === 'exercise-pull-up';
+  const direct = standard.matchQuality === 'custom' && standard.loadRepresentation === 'addedWeight';
+  const thresholds = level.personalizedThresholds ?? standard.thresholds;
+  const minReps = Math.max(1, exercise.repRangeMin || exercise.reps || 1);
+  const maxReps = Math.max(minReps, exercise.repRangeMax || exercise.reps || minReps);
+  const formatRecommendation = (threshold: number) => {
+    if (pullUp) {
+      if (!profile.bodyweightKg) return 'Set bodyweight';
+      const setup = pullUpTargetSetup(profile.bodyweightKg, threshold, targetReps);
+      if (!setup) return 'Unavailable';
+      if (setup.mode === 'assisted') return `${setup.assistanceKg.toFixed(1)} kg assistance`;
+      if (setup.mode === 'weighted') return `+${setup.addedWeightKg.toFixed(1)} kg`;
+      return 'Bodyweight';
+    }
+    const value = direct ? threshold : requiredWorkingWeight(threshold, targetReps);
+    if (value === null) return 'Unavailable';
+    const suffix = standard.loadRepresentation === 'perDumbbell' ? ' kg / dumbbell'
+      : standard.loadRepresentation === 'perSide' ? ' kg / side'
+        : standard.loadRepresentation === 'addedWeight' ? ' kg added' : ' kg';
+    return `${value.toFixed(1)}${suffix}`;
+  };
+  return <div className="personalized-level-table"><div className="level-table-heading"><div><strong>L1–L10 working weights</strong><small>Personalized from immutable 1RM benchmarks</small></div><label><span>VIEW AT REPS</span><select value={targetReps} onChange={(event) => setTargetReps(Number(event.target.value))}>{Array.from({ length: Math.max(1, maxReps - minReps + 1) }, (_, index) => minReps + index).map((reps) => <option key={reps} value={reps}>{reps} reps</option>)}</select></label></div><div className="level-table-rows">{STRENGTH_LEVELS.map((tier, index) => <div key={tier.name} className={index + 1 === level.index ? 'current' : ''}><span>L{index + 1}</span><strong>{tier.name}</strong><b>{formatRecommendation(thresholds[index])}</b><small>{(level.baselineThresholds ?? standard.thresholds)[index]} kg 1RM baseline</small></div>)}</div><p>Calculated recommendations use the same rep multiplier in both directions. High-rep or non-failure sets are approximate.</p></div>;
 }
 
 function UngradedStrengthDetail({ exercise }: { exercise: LibraryExercise }) {

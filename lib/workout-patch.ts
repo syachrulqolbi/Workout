@@ -3,9 +3,9 @@ import {
   type ExerciseRecord, type Meal, type WorkoutData, type WorkoutSession,
 } from '@/lib/workout-data';
 
-export type ClientDataScope = 'active' | 'plans' | 'schedule' | 'history' | 'meals';
+export type ClientDataScope = 'active' | 'plans' | 'schedule' | 'history' | 'meals' | 'profile';
 export type WorkoutDataChanges = Partial<Pick<WorkoutData,
-  'activeWorkout' | 'dayPlans' | 'levelResetAt' | 'datePlanOverrides' | 'workouts' | 'exerciseHistory' | 'meals'
+  'activeWorkout' | 'dayPlans' | 'levelResetAt' | 'standardsVersion' | 'datePlanOverrides' | 'workouts' | 'exerciseHistory' | 'meals' | 'profile'
 >>;
 export type CollectionMutation<T extends { id: string }> = {
   upserts: Array<{ item: T; order: number }>;
@@ -18,17 +18,18 @@ export type WorkoutCollectionChanges = {
 };
 
 export function isClientDataScope(value: unknown): value is ClientDataScope {
-  return value === 'active' || value === 'plans' || value === 'schedule' || value === 'history' || value === 'meals';
+  return value === 'active' || value === 'plans' || value === 'schedule' || value === 'history' || value === 'meals' || value === 'profile';
 }
 
 export function workoutDataChanges(data: WorkoutData, scopes: ClientDataScope[]): WorkoutDataChanges {
   const selected = new Set(scopes);
   return {
     ...(selected.has('active') ? { activeWorkout: data.activeWorkout } : {}),
-    ...(selected.has('plans') ? { dayPlans: data.dayPlans, levelResetAt: data.levelResetAt } : {}),
+    ...(selected.has('plans') ? { dayPlans: data.dayPlans, levelResetAt: data.levelResetAt, standardsVersion: data.standardsVersion } : {}),
     ...(selected.has('schedule') ? { datePlanOverrides: data.datePlanOverrides } : {}),
     ...(selected.has('history') ? { workouts: data.workouts, exerciseHistory: data.exerciseHistory } : {}),
     ...(selected.has('meals') ? { meals: data.meals } : {}),
+    ...(selected.has('profile') ? { profile: data.profile } : {}),
   };
 }
 
@@ -112,11 +113,12 @@ export function isWorkoutDataChanges(value: unknown, scopes: ClientDataScope[], 
   const changes = value as WorkoutDataChanges;
   const selected = new Set(scopes);
   if (selected.has('active') && changes.activeWorkout !== null && typeof changes.activeWorkout !== 'object') return false;
-  if (selected.has('plans') && (!Array.isArray(changes.dayPlans) || changes.dayPlans.length > 7 || typeof changes.levelResetAt !== 'string')) return false;
+  if (selected.has('plans') && (!Array.isArray(changes.dayPlans) || changes.dayPlans.length > 7 || typeof changes.levelResetAt !== 'string' || typeof changes.standardsVersion !== 'string')) return false;
   if (selected.has('schedule') && (!changes.datePlanOverrides || typeof changes.datePlanOverrides !== 'object' || Array.isArray(changes.datePlanOverrides))) return false;
   if (selected.has('history') && !collections && (!Array.isArray(changes.workouts) || changes.workouts.length > 5_000
     || !Array.isArray(changes.exerciseHistory) || changes.exerciseHistory.length > 20_000)) return false;
   if (selected.has('meals') && !collections && (!Array.isArray(changes.meals) || changes.meals.length > 5_000)) return false;
+  if (selected.has('profile') && (!changes.profile || typeof changes.profile !== 'object' || Array.isArray(changes.profile))) return false;
   return scopes.length > 0;
 }
 
@@ -125,10 +127,11 @@ export function applyWorkoutDataChanges(current: WorkoutData, changes: WorkoutDa
   return normalizeWorkoutData({
     ...current,
     ...(selected.has('active') ? { activeWorkout: changes.activeWorkout } : {}),
-    ...(selected.has('plans') ? { dayPlans: changes.dayPlans, levelResetAt: changes.levelResetAt } : {}),
+    ...(selected.has('plans') ? { dayPlans: changes.dayPlans, levelResetAt: changes.levelResetAt, standardsVersion: changes.standardsVersion } : {}),
     ...(selected.has('schedule') ? { datePlanOverrides: changes.datePlanOverrides } : {}),
     ...(selected.has('history') ? { workouts: changes.workouts, exerciseHistory: changes.exerciseHistory } : {}),
     ...(selected.has('meals') ? { meals: changes.meals } : {}),
+    ...(selected.has('profile') ? { profile: changes.profile } : {}),
   });
 }
 
