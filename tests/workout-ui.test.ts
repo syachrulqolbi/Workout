@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DayPlan, Meal } from '../lib/workout-data';
-import { accountInitials, dateSelectionAfterRollover, formatTimer, mealNutritionOverview, scheduledPlanDay, workoutPlanForDate } from '../lib/workout-ui';
+import { accountInitials, dateSelectionAfterRollover, formatNumber, formatTimer, mealNutritionOverview, scheduledPlanDay, workoutPlanForDate } from '../lib/workout-ui';
 
 describe('workout UI helpers', () => {
   it('uses the first letter of the first two name words', () => {
@@ -31,6 +31,13 @@ describe('workout UI helpers', () => {
   it('formats both minute and hour countdowns', () => {
     expect(formatTimer(33)).toBe('00:33');
     expect(formatTimer(3661)).toBe('1:01:01');
+  });
+
+  it('shows at most two decimal places without changing integers', () => {
+    expect(formatNumber(69.285714)).toBe('69.29');
+    expect(formatNumber(42.5)).toBe('42.5');
+    expect(formatNumber(86)).toBe('86');
+    expect(formatNumber(1234.567)).toBe('1,234.57');
   });
 
   it('moves an open current-day view forward at midnight without replacing a historical selection', () => {

@@ -4,7 +4,7 @@ import { Check, ChevronLeft, ChevronRight, Dumbbell, Salad } from 'lucide-react'
 import { useMemo, useState } from 'react';
 import { DAY_NAMES, DAY_SHORT, type DayPlan, type Meal, type WorkoutSession } from '@/lib/workout-data';
 import { workoutMatchesPlan } from '@/lib/workout-identity';
-import { formatDate, localDateKey, mealsForDate, mondayIndex, workoutPlanForDate } from '@/lib/workout-ui';
+import { formatDate, formatNumber, localDateKey, mealsForDate, mondayIndex, workoutPlanForDate } from '@/lib/workout-ui';
 
 type CalendarViewProps = {
   todayKey: string;
@@ -154,14 +154,14 @@ export function CalendarView({ todayKey, selectedDate, selectDate, workouts, mea
               <div className="calendar-workout-head" role="row"><span role="columnheader">Exercise</span><span role="columnheader">Sets</span><span role="columnheader">Reps/time</span><span role="columnheader">Kg</span></div>
               {selectedPlan.exercises.map((exercise) => (
                 <div className="calendar-workout-row" role="row" key={exercise.id}>
-                  <span role="cell"><b>{exercise.name}</b>{exercise.type === 'cardio' && <small>{exercise.durationMinutes} min{exercise.distanceKm ? ` · ${exercise.distanceKm} km` : ''}</small>}</span>
-                  <strong role="cell">{exercise.sets}</strong><strong role="cell">{exercise.type === 'strength' ? exercise.measurement === 'duration' ? `${exercise.durationSeconds}s` : exercise.reps : '—'}</strong><strong role="cell">{exercise.type === 'strength' && exercise.measurement === 'reps' && exercise.loadMode !== 'bodyweight' ? exercise.weight : '—'}</strong>
+                  <span role="cell"><b>{exercise.name}</b>{exercise.type === 'cardio' && <small>{formatNumber(exercise.durationMinutes)} min{exercise.distanceKm ? ` · ${formatNumber(exercise.distanceKm)} km` : ''}</small>}</span>
+                  <strong role="cell">{exercise.sets}</strong><strong role="cell">{exercise.type === 'strength' ? exercise.measurement === 'duration' ? `${formatNumber(exercise.durationSeconds)}s` : exercise.reps : '—'}</strong><strong role="cell">{exercise.type === 'strength' && exercise.measurement === 'reps' && exercise.loadMode !== 'bodyweight' ? formatNumber(exercise.weight) : '—'}</strong>
                 </div>
               ))}
             </div>
           ) : <p>No workout scheduled.</p>}
           {selectedSkipped && <p className="skipped-session">Not completed within seven days of this date.</p>}
-          {selectedWorkouts.map((workout) => <p className="completed-session" key={workout.id}><Check size={13} /> {workout.name} · {workout.duration} min{workoutMatchesPlan(workout, selectedPlanDay, selectedPlan.name) ? '' : ' · different plan'}</p>)}
+          {selectedWorkouts.map((workout) => <p className="completed-session" key={workout.id}><Check size={13} /> {workout.name} · {formatNumber(workout.duration)} min{workoutMatchesPlan(workout, selectedPlanDay, selectedPlan.name) ? '' : ' · different plan'}</p>)}
         </section>
 
         <section className="calendar-agenda">

@@ -8,7 +8,7 @@ import {
 } from '@/lib/exercise-profile';
 import { type ActiveRestTimer, type ActiveWorkout, type ExerciseEntry, type ExerciseRecord, type LibraryExercise, type SetEntry, type StrengthProfile } from '@/lib/workout-data';
 import { indexLatestExerciseRecords, latestExerciseRecord } from '@/lib/workout-identity';
-import { formatTimer } from '@/lib/workout-ui';
+import { formatNumber, formatTimer } from '@/lib/workout-ui';
 import { useDialogAccessibility } from '@/features/workout/hooks/use-dialog-accessibility';
 
 type WorkoutModalProps = {
@@ -207,7 +207,7 @@ export function WorkoutModal({
         </div>
 
         <footer className="workout-footer swipe-workout-footer">
-          <div><span>SESSION OUTPUT</span><strong>{[totalVolume ? `${totalVolume.toLocaleString()} kg` : '', cardioMinutes ? `${cardioMinutes} cardio min` : ''].filter(Boolean).join(' · ') || 'Mark an entry complete'}</strong></div>
+          <div><span>SESSION OUTPUT</span><strong>{[totalVolume ? `${formatNumber(totalVolume)} kg` : '', cardioMinutes ? `${formatNumber(cardioMinutes)} cardio min` : ''].filter(Boolean).join(' · ') || 'Mark an entry complete'}</strong></div>
           <div className="workout-swipe-actions"><button className="workout-arrow" onClick={() => showExercise(activeIndex - 1)} disabled={!previousExercise} aria-label="Previous exercise"><ChevronLeft size={20} /></button><button className="complete-set-button" onClick={finishNextSet} disabled={!activeExercise?.sets.some((set) => !set.done)}>{activeExercise?.sets.every((set) => set.done) ? 'Exercise complete' : 'Complete set'}</button><button className="workout-arrow" onClick={() => showExercise(activeIndex + 1)} disabled={!nextExercise} aria-label="Next exercise"><ChevronRight size={20} /></button></div>
           <button className="discard-button" onClick={() => releaseAudio(discard)}><Trash2 size={15} /> Discard</button>
           <button className="complete-button" disabled={!finishedSets} onClick={() => releaseAudio(() => complete(elapsed))}>Complete workout <Check size={17} /></button>
@@ -224,13 +224,13 @@ function PullUpModePicker({ exercise, update }: { exercise: ExerciseEntry; updat
 
 function ExerciseMetrics({ exercise }: { exercise: ExerciseEntry }) {
   const weightedHold = isWeightedHoldStandard(exercise.levelStandard);
-  const load = exercise.type === 'cardio' ? `${exercise.targetDurationMinutes} min`
-    : weightedHold ? `${exercise.targetWeight ? `+${exercise.targetWeight} kg` : 'Bodyweight'} · ${exercise.targetDurationSeconds} sec`
-    : exercise.measurement === 'duration' ? `${exercise.targetDurationSeconds} sec`
+  const load = exercise.type === 'cardio' ? `${formatNumber(exercise.targetDurationMinutes)} min`
+    : weightedHold ? `${exercise.targetWeight ? `+${formatNumber(exercise.targetWeight)} kg` : 'Bodyweight'} · ${formatNumber(exercise.targetDurationSeconds)} sec`
+    : exercise.measurement === 'duration' ? `${formatNumber(exercise.targetDurationSeconds)} sec`
     : exercise.loadMode === 'bodyweight' ? 'Bodyweight'
-    : exercise.loadMode === 'assistance' ? `${exercise.targetWeight} kg assist`
-    : isLoadedBackExtension(exercise) ? exercise.targetWeight ? `+${exercise.targetWeight} kg` : 'Bodyweight'
-    : `${exercise.targetWeight} kg`;
+    : exercise.loadMode === 'assistance' ? `${formatNumber(exercise.targetWeight)} kg assist`
+    : isLoadedBackExtension(exercise) ? exercise.targetWeight ? `+${formatNumber(exercise.targetWeight)} kg` : 'Bodyweight'
+    : `${formatNumber(exercise.targetWeight)} kg`;
   const effort = exercise.type === 'cardio' ? 'Cardio'
     : exercise.measurement === 'duration' ? 'Timed' : `${exercise.targetReps} reps`;
   return <div className="workout-card-metrics"><div><strong>{load}</strong><span>LOAD</span></div><div><strong>{exercise.sets.length}</strong><span>SETS</span></div><div><strong>{effort}</strong><span>{exercise.measurement === 'duration' ? 'MODE' : 'REPS'}</span></div><div><strong>{exercise.restSeconds ? `${exercise.restSeconds} sec` : '—'}</strong><span>REST</span></div></div>;
@@ -337,7 +337,7 @@ function ProgressionGuidance({ exercise, previous }: { exercise: ExerciseEntry; 
     const nextMinutes = exercise.targetDurationMinutes + minuteStep;
     const nextDistance = exercise.targetDistanceKm ? Math.round((exercise.targetDistanceKm + 0.2) * 10) / 10 : 0;
     const previousText = previous
-      ? `Previous total · ${previous.durationMinutes} min${previous.distanceKm ? ` · ${previous.distanceKm} km` : ''}${previous.calories ? ` · ${previous.calories} kcal` : ''}`
+      ? `Previous total · ${formatNumber(previous.durationMinutes)} min${previous.distanceKm ? ` · ${formatNumber(previous.distanceKm)} km` : ''}${previous.calories ? ` · ${formatNumber(previous.calories)} kcal` : ''}`
       : 'No previous cardio session logged';
     const advice = ready
       ? `${currentMet ? 'Target reached. Next session' : 'Previous target complete. Today'} try ${nextMinutes} min${nextDistance ? ` or ${nextDistance} km` : ''}.`
@@ -363,7 +363,7 @@ function ProgressionGuidance({ exercise, previous }: { exercise: ExerciseEntry; 
       const nextLevel = Math.min(10, Math.max(targetLevel, previousLevel) + (ready ? 1 : 0));
       const nextWeight = standard.thresholds[nextLevel - 1];
       const nextSeconds = standard.holdSeconds[nextLevel - 1];
-      const formatTarget = (weight: number, seconds: number) => `${weight ? `+${weight} kg` : 'bodyweight'} for ${seconds} sec`;
+      const formatTarget = (weight: number, seconds: number) => `${weight ? `+${formatNumber(weight)} kg` : 'bodyweight'} for ${formatNumber(seconds)} sec`;
       const previousText = previousBest
         ? `Previous best · L${previousLevel} · ${formatTarget(previousBest.weight, previousBest.durationSeconds)}`
         : 'No previous plank session logged';
@@ -394,7 +394,7 @@ function ProgressionGuidance({ exercise, previous }: { exercise: ExerciseEntry; 
   const step = exercise.targetWeight >= 80 ? 5 : 2.5;
   const nextWeight = Math.max(0, exercise.targetWeight + (inverseLoad ? -step : step));
   const previousText = previous
-    ? `Previous best · ${previous.weight} kg${previous.reps ? ` × ${previous.reps} reps` : ' · reps unavailable'}${previous.setsCompleted ? ` · ${previous.setsCompleted} sets` : ''}${previous.estimated ? ' · estimated' : ''}`
+    ? `Previous best · ${formatNumber(previous.weight)} kg${previous.reps ? ` × ${formatNumber(previous.reps)} reps` : ' · reps unavailable'}${previous.setsCompleted ? ` · ${formatNumber(previous.setsCompleted)} sets` : ''}${previous.estimated ? ' · estimated' : ''}`
     : 'No previous strength session logged';
 
   let advice: string;
@@ -404,9 +404,9 @@ function ProgressionGuidance({ exercise, previous }: { exercise: ExerciseEntry; 
       ? `${currentMet ? 'Target reached. Next session' : 'Previous target complete. Today'} aim for ${nextReps} reps per set.`
       : `Keep ${exercise.targetReps} reps until every work set is controlled, then add reps.`;
   } else if (ready) {
-    advice = `${currentMet ? 'Target reached. Next session' : 'Previous target complete. Today'} try ${nextWeight} kg × ${exercise.targetReps} reps.`;
+    advice = `${currentMet ? 'Target reached. Next session' : 'Previous target complete. Today'} try ${formatNumber(nextWeight)} kg × ${exercise.targetReps} reps.`;
   } else {
-    advice = `Hold ${exercise.targetWeight} kg until every work set reaches ${exercise.targetReps} reps, then ${inverseLoad ? 'reduce assistance' : 'add weight'}.`;
+    advice = `Hold ${formatNumber(exercise.targetWeight)} kg until every work set reaches ${exercise.targetReps} reps, then ${inverseLoad ? 'reduce assistance' : 'add weight'}.`;
   }
 
   return <ProgressionDetails achieved={currentMet} previousText={previousText} advice={advice} />;

@@ -3,7 +3,7 @@
 import { CalendarDays, Camera, Check, Pencil, Plus, Salad, Trash2, Utensils } from 'lucide-react';
 import { EmptyState } from '@/features/workout/components/empty-state';
 import { DAY_NAMES, type Meal } from '@/lib/workout-data';
-import { formatDate, mealNutritionOverview, mondayIndex } from '@/lib/workout-ui';
+import { formatDate, formatNumber, mealNutritionOverview, mondayIndex } from '@/lib/workout-ui';
 
 type MealsViewProps = {
   todayKey: string;
@@ -47,13 +47,13 @@ export function MealsView({
       <section className={`meal-overview ${isToday ? 'today-outline' : ''}`}>
         <div className="meal-overview-copy">
           <span className="pill dark">{isToday ? 'TODAY' : DAY_NAMES[mondayIndex(new Date(`${selectedDate}T00:00:00`))].toUpperCase()} NUTRITION</span>
-          <h2>{eatenTotals.kcal.toLocaleString()} <small>kcal eaten</small></h2>
-          <p>{plannedTotals.kcal.toLocaleString()} kcal planned · {nutrition.eatenCount}/{nutrition.plannedCount} meals eaten · {displayDate}</p>
+          <h2>{formatNumber(eatenTotals.kcal)} <small>kcal eaten</small></h2>
+          <p>{formatNumber(plannedTotals.kcal)} kcal planned · {nutrition.eatenCount}/{nutrition.plannedCount} meals eaten · {displayDate}</p>
         </div>
         <div className="meal-overview-nutrients">
           <div className="meal-overview-key"><span>NUTRIENTS</span><strong>EATEN / PLANNED</strong></div>
           <div className="meal-macros">
-            {nutrientRows.map(([label, eaten, planned]) => <span key={label}><b>{eaten}g <em>/ {planned}g</em></b><small>{label}</small></span>)}
+            {nutrientRows.map(([label, eaten, planned]) => <span key={label}><b>{formatNumber(eaten)}g <em>/ {formatNumber(planned)}g</em></b><small>{label}</small></span>)}
           </div>
         </div>
       </section>
@@ -119,7 +119,7 @@ function MealCard({ meal, index, toggleMeal, editMeal, deleteMeal }: {
       </div>
       <div className="meal-card-meta"><span className="muted-label">{meal.type.toUpperCase()}</span><span className={`meal-scope ${meal.recurring ? 'daily' : ''}`}>{meal.recurring ? 'DAILY PLAN' : 'THIS DATE'}</span></div>
       <h3>{meal.name}</h3><p>{meal.note}</p>
-      <div className="meal-card-bottom"><strong>{meal.kcal} kcal</strong><span>P {meal.protein} · C {meal.carbs} · F {meal.fats} · S {meal.sugar}</span></div>
+      <div className="meal-card-bottom"><strong>{formatNumber(meal.kcal)} kcal</strong><span>P {formatNumber(meal.protein)} · C {formatNumber(meal.carbs)} · F {formatNumber(meal.fats)} · S {formatNumber(meal.sugar)}</span></div>
     </article>
   );
 }

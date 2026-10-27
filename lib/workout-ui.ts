@@ -1,6 +1,15 @@
 import type { DayPlan, Meal, WorkoutSession } from '@/lib/workout-data';
 
 const REST_DAY_PLAN: DayPlan = { day: -1, name: 'Rest day', focus: 'Recovery and schedule reset', exercises: [] };
+const DISPLAY_NUMBER_FORMATTER = new Intl.NumberFormat('en-AU', {
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 0,
+});
+
+/** Format UI numbers without changing the full-precision value used by calculations. */
+export function formatNumber(value: number) {
+  return Number.isFinite(value) ? DISPLAY_NUMBER_FORMATTER.format(value) : '—';
+}
 
 export function localDateKey(date = new Date()) {
   const year = date.getFullYear();

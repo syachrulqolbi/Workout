@@ -8,6 +8,7 @@ import {
 } from '@/lib/exercise-profile';
 import { DAY_NAMES, type DayPlan, type ExerciseRecord, type LibraryExercise, type StrengthProfile } from '@/lib/workout-data';
 import { pullUpTargetSetup, requiredWorkingWeight } from '@/lib/strength-calculations';
+import { formatNumber } from '@/lib/workout-ui';
 
 type SummaryMuscle = { group: MuscleGroup; score: number; direct: boolean; color: string };
 
@@ -109,7 +110,7 @@ function PlanSummaryDetail({ exercises, muscles, averageLevel, gradedExerciseCou
   const strengthCount = uniqueExercises.filter((exercise) => exercise.type === 'strength').length;
   const cardioCount = uniqueExercises.length - strengthCount;
   const averageTier = averageLevel === null ? null : STRENGTH_LEVELS[Math.max(0, Math.min(9, Math.round(averageLevel) - 1))];
-  const averageDisplay = averageLevel === null ? null : averageLevel.toFixed(1);
+  const averageDisplay = averageLevel === null ? null : formatNumber(averageLevel);
   return (
     <div className="strength-level-detail plan-summary-detail">
       <span className="level-kicker">WEEKLY PLAN SUMMARY</span>
@@ -130,11 +131,11 @@ function StrengthLevelDetail({ level, exercise, profile }: { level: NonNullable<
   const selectedTier = { ...STRENGTH_LEVELS[selectedIndex - 1], name: levelNames[selectedIndex - 1] };
   const selectedRange = level.ranges[selectedIndex - 1] ?? { min: level.rangeMin, max: level.rangeMax };
   const selectedMilestone = level.milestones?.[selectedIndex - 1];
-  const formatWeightedHold = (weight: number, seconds: number) => `${weight ? `+${weight} kg added` : 'Bodyweight'} · ${seconds} sec`;
+  const formatWeightedHold = (weight: number, seconds: number) => `${weight ? `+${formatNumber(weight)} kg added` : 'Bodyweight'} · ${formatNumber(seconds)} sec`;
   const formatMetric = (value: number) => level.metric === 'assistanceEquivalent'
-    ? value < 0 ? `${Math.abs(value)} kg assistance` : value === 0 ? 'Bodyweight' : `+${value} kg added`
-    : level.isAddedWeight ? value === 0 ? 'Bodyweight' : `+${value} kg added`
-    : `${value} ${level.unit}`;
+    ? value < 0 ? `${formatNumber(Math.abs(value))} kg assistance` : value === 0 ? 'Bodyweight' : `+${formatNumber(value)} kg added`
+    : level.isAddedWeight ? value === 0 ? 'Bodyweight' : `+${formatNumber(value)} kg added`
+    : `${formatNumber(value)} ${level.unit}`;
   const loadSuffix = level.metric === 'weight' && !level.isAddedWeight ? level.isAssistance ? ' assistance' : level.loadMode === 'perSide' ? ' per side' : ' total' : '';
   const load = level.metric === 'weightedHold'
     ? formatWeightedHold(level.bestWeight ?? 0, level.bestSeconds ?? 0)
@@ -193,8 +194,8 @@ function PersonalizedLevelTable({ exercise, profile, level, targetReps, setTarge
       if (!profile.bodyweightKg) return 'Set bodyweight';
       const setup = pullUpTargetSetup(profile.bodyweightKg, threshold, targetReps);
       if (!setup) return 'Unavailable';
-      if (setup.mode === 'assisted') return `${setup.assistanceKg.toFixed(1)} kg assistance`;
-      if (setup.mode === 'weighted') return `+${setup.addedWeightKg.toFixed(1)} kg`;
+      if (setup.mode === 'assisted') return `${formatNumber(setup.assistanceKg)} kg assistance`;
+      if (setup.mode === 'weighted') return `+${formatNumber(setup.addedWeightKg)} kg`;
       return 'Bodyweight';
     }
     const value = direct ? threshold : requiredWorkingWeight(threshold, targetReps);
@@ -202,9 +203,9 @@ function PersonalizedLevelTable({ exercise, profile, level, targetReps, setTarge
     const suffix = standard.loadRepresentation === 'perDumbbell' ? ' kg / dumbbell'
       : standard.loadRepresentation === 'perSide' ? ' kg / side'
         : standard.loadRepresentation === 'addedWeight' ? ' kg added' : ' kg';
-    return `${value.toFixed(1)}${suffix}`;
+    return `${formatNumber(value)}${suffix}`;
   };
-  return <div className="personalized-level-table"><div className="level-table-heading"><div><strong>L1–L10 working weights</strong><small>Personalized from immutable 1RM benchmarks</small></div><label><span>VIEW AT REPS</span><select value={targetReps} onChange={(event) => setTargetReps(Number(event.target.value))}>{Array.from({ length: Math.max(1, maxReps - minReps + 1) }, (_, index) => minReps + index).map((reps) => <option key={reps} value={reps}>{reps} reps</option>)}</select></label></div><div className="level-table-rows">{STRENGTH_LEVELS.map((tier, index) => <div key={tier.name} className={index + 1 === level.index ? 'current' : ''}><span>L{index + 1}</span><strong>{tier.name}</strong><b>{formatRecommendation(thresholds[index])}</b><small>{(level.baselineThresholds ?? standard.thresholds)[index]} kg 1RM baseline</small></div>)}</div><p>Calculated recommendations use the same rep multiplier in both directions. High-rep or non-failure sets are approximate.</p></div>;
+  return <div className="personalized-level-table"><div className="level-table-heading"><div><strong>L1–L10 working weights</strong><small>Personalized from immutable 1RM benchmarks</small></div><label><span>VIEW AT REPS</span><select value={targetReps} onChange={(event) => setTargetReps(Number(event.target.value))}>{Array.from({ length: Math.max(1, maxReps - minReps + 1) }, (_, index) => minReps + index).map((reps) => <option key={reps} value={reps}>{reps} reps</option>)}</select></label></div><div className="level-table-rows">{STRENGTH_LEVELS.map((tier, index) => <div key={tier.name} className={index + 1 === level.index ? 'current' : ''}><span>L{index + 1}</span><strong>{tier.name}</strong><b>{formatRecommendation(thresholds[index])}</b><small>{formatNumber((level.baselineThresholds ?? standard.thresholds)[index])} kg 1RM baseline</small></div>)}</div><p>Calculated recommendations use the same rep multiplier in both directions. High-rep or non-failure sets are approximate.</p></div>;
 }
 
 function UngradedStrengthDetail({ exercise }: { exercise: LibraryExercise }) {
@@ -223,7 +224,7 @@ function CardioDetail({ exercise }: { exercise: LibraryExercise }) {
     <div className="strength-level-detail cardio-detail">
       <span className="level-kicker">CARDIO EXERCISE</span>
       <div className="level-title"><h4>No strength level</h4><span><Activity size={18} /></span></div>
-      <div className="level-metrics"><div><span>DURATION</span><strong>{exercise.durationMinutes} min</strong></div><div><span>TARGET</span><strong>{exercise.calories ? `${exercise.calories} kcal` : exercise.distanceKm ? `${exercise.distanceKm} km` : 'Time based'}</strong></div></div>
+      <div className="level-metrics"><div><span>DURATION</span><strong>{formatNumber(exercise.durationMinutes)} min</strong></div><div><span>TARGET</span><strong>{exercise.calories ? `${formatNumber(exercise.calories)} kcal` : exercise.distanceKm ? `${formatNumber(exercise.distanceKm)} km` : 'Time based'}</strong></div></div>
       <p>Cardio trains the highlighted muscles but is excluded from KG-based levels.</p>
     </div>
   );
