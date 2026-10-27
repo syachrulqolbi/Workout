@@ -14,6 +14,7 @@ if (!accessToken) throw new Error('GCP_ACCESS_TOKEN is required. No data was cha
 if (apply && rollback) throw new Error('Choose --apply or --rollback, not both.');
 
 const databaseRoot = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents`;
+const databaseResource = `projects/${projectId}/databases/${databaseId}/documents`;
 const headers = { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
 
 type FirestoreValue = Record<string, unknown>;
@@ -76,10 +77,11 @@ const originalData = existing.data && typeof existing.data === 'object' ? existi
 if (!originalData) throw new Error('The account has no workout data. No data was changed.');
 const beforeCounts = { workouts: await collectionCount(accountId, 'workouts'), history: await collectionCount(accountId, 'exercise-history') };
 const backupId = `${accountId}--${STRENGTH_STANDARD_VERSION}`;
-const backupName = `${databaseRoot}/workout-migration-backups/${backupId}`;
+const backupName = `${databaseResource}/workout-migration-backups/${backupId}`;
+const backupUrl = `${databaseRoot}/workout-migration-backups/${backupId}`;
 
 if (rollback) {
-  const backupResponse = await fetch(backupName, { headers });
+  const backupResponse = await fetch(backupUrl, { headers });
   if (!backupResponse.ok) throw new Error(`Rollback backup was not found (${backupResponse.status}). No data was changed.`);
   const backupDocument = await backupResponse.json() as { fields: Record<string, FirestoreValue> };
   const backup = Object.fromEntries(Object.entries(backupDocument.fields).map(([key, value]) => [key, fromFirestoreValue(value)])) as Record<string, unknown>;
@@ -136,7 +138,7 @@ console.log(`Change required: ${changed ? 'yes' : 'no'}; mode: ${apply ? 'apply'
 if (unmapped.length || duplicateWithinDay.length) throw new Error('Migration verification failed before write. No data was changed.');
 if (!apply || !changed) process.exit(0);
 
-const backupResponse = await fetch(backupName, { headers });
+const backupResponse = await fetch(backupUrl, { headers });
 const backupExists = backupResponse.ok;
 if (!backupExists && backupResponse.status !== 404) throw new Error(`Backup check failed (${backupResponse.status}). No data was changed.`);
 const writes = [] as unknown[];
