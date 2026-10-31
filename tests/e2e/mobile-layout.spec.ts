@@ -69,12 +69,13 @@ test('history correction sheet keeps exercise values compact and uses the produc
     distanceKm: 0,
     calories: 0,
   }];
+  const recordedExercises = data.dayPlans[0].exercises.slice(1, 3);
   data.exerciseHistory = [
     {
       id: 'record-1',
       sessionId: 'session-1',
-      exerciseId: 'exercise-chest-fly-machine',
-      exercise: 'Chest fly machine',
+      exerciseId: recordedExercises[0].id,
+      exercise: recordedExercises[0].name,
       date: '2026-10-23T08:30:00.000Z',
       type: 'strength',
       measurement: 'reps',
@@ -93,8 +94,8 @@ test('history correction sheet keeps exercise values compact and uses the produc
     {
       id: 'record-2',
       sessionId: 'session-1',
-      exerciseId: 'exercise-face-pull',
-      exercise: 'Face pull',
+      exerciseId: recordedExercises[1].id,
+      exercise: recordedExercises[1].name,
       date: '2026-10-23T08:30:00.000Z',
       type: 'strength',
       measurement: 'reps',
@@ -130,7 +131,10 @@ test('history correction sheet keeps exercise values compact and uses the produc
   const firstRecord = dialog.locator('.history-record-card').first();
   const saveButton = dialog.getByRole('button', { name: 'Save corrections' });
   await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.history-record-card')).toHaveCount(data.dayPlans[0].exercises.length);
+  await expect(dialog.getByText(/2 recorded · \d+ missing/)).toBeVisible();
   await expect(firstRecord).toBeVisible();
+  await expect(firstRecord.getByText('NOT RECORDED')).toBeVisible();
   await expect(saveButton).toHaveCSS('background-color', 'rgb(51, 51, 51)');
   await expect(saveButton).toHaveCSS('color', 'rgb(255, 255, 255)');
 
@@ -139,6 +143,17 @@ test('history correction sheet keeps exercise values compact and uses the produc
   expect(Math.abs((weightBox?.y ?? 0) - (repsBox?.y ?? 0))).toBeLessThanOrEqual(1);
   expect(weightBox?.width).toBeGreaterThan(100);
   expect(repsBox?.width).toBeGreaterThan(100);
+
+  await firstRecord.getByLabel('KG').fill('62.5');
+  await firstRecord.getByLabel('REPS').fill('6');
+  await firstRecord.getByLabel('SETS').fill('4');
+  await saveButton.click();
+  await expect(dialog).not.toBeVisible();
+
+  await page.getByRole('button', { name: /Edit Push \/ Pull/ }).click();
+  const correctedDialog = page.getByRole('dialog', { name: 'Edit workout history' });
+  await expect(correctedDialog.getByText('3 recorded', { exact: true })).toBeVisible();
+  await expect(correctedDialog.locator('.history-record-card.missing')).toHaveCount(0);
 });
 
 test('active workout keeps the card wide, compact and vertically usable', async ({ page }, testInfo) => {

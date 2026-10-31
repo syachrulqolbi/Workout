@@ -13,7 +13,7 @@ import type { NutritionDraft } from '@/features/workout/components/meal-modal';
 import { SettingsView } from '@/features/workout/components/settings-view';
 import type { AppUser } from '@/lib/auth-user';
 import { authenticatedFetch } from '@/lib/client/authenticated-fetch';
-import { canonicalExerciseName, isWeightedHoldStandard, strengthLevelForActiveExercise, weightedHoldLevel } from '@/lib/exercise-profile';
+import { canonicalExerciseName, isWeightedHoldStandard, strengthLevelForActiveExercise, strengthLevelForExercise, weightedHoldLevel } from '@/lib/exercise-profile';
 import {
   compactDatePlanOverrides, compactMealCompletionDates, createDefaultWorkoutData, DAY_NAMES, isWorkoutData, normalizeWorkoutData, stableExerciseId,
   type ActiveWorkout, type DayPlan, type LibraryExercise, type Meal,
@@ -573,6 +573,13 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
       exercises: active.exercises.filter((exercise) => exercise.sets.some((set) => set.done)).length,
       sets: strengthSets.filter((set) => set.done).length, volume: totalVolume,
       cardioMinutes, distanceKm: cardioDistance, calories: cardioCalories,
+      plannedExercises: active.exercises.map((exercise) => ({
+        id: exercise.id, name: exercise.name, type: exercise.type, measurement: exercise.measurement, loadMode: exercise.loadMode,
+        weight: exercise.targetWeight, reps: exercise.targetReps, sets: exercise.sets.length,
+        durationSeconds: exercise.targetDurationSeconds, durationMinutes: exercise.targetDurationMinutes,
+        distanceKm: exercise.targetDistanceKm, calories: exercise.sets[0]?.calories ?? 0,
+        restSeconds: exercise.restSeconds,
+      })),
     };
     const records = active.exercises.flatMap((exercise) => {
       const completed = exercise.sets.filter((set) => set.done);
@@ -633,22 +640,38 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
   }
 
   function saveWorkoutCorrection(workout: WorkoutSession, records: WorkoutData['exerciseHistory']) {
-    const recordIds = new Set(records.map((record) => record.id));
-    const volume = records.filter((record) => record.type === 'strength' && record.measurement === 'reps')
+    const sessionPlan = workout.plannedExercises?.length
+      ? workout.plannedExercises
+      : data.dayPlans.find((plan) => plan.day === workout.planDay)?.exercises
+        ?? data.dayPlans.find((plan) => plan.name === workout.name)?.exercises
+        ?? [];
+    const correctedRecords = records.map((record) => {
+      const plan = sessionPlan.find((exercise) => exercise.id === record.exerciseId)
+        ?? sessionPlan.find((exercise) => stableExerciseId(exercise.name) === stableExerciseId(record.exercise));
+      const rawEstimate = record.type === 'strength' && record.measurement === 'reps'
+        ? estimatedOneRepMax(record.weight, record.reps) : null;
+      const nextRecord = { ...record, estimatedOneRepMax: rawEstimate, achievedLevel: null };
+      const grade = plan ? strengthLevelForExercise(plan, [nextRecord], data.levelResetAt, undefined, data.profile) : null;
+      return { ...nextRecord, achievedLevel: grade?.index ?? null, estimatedOneRepMax: grade?.estimatedOneRepMax ?? rawEstimate };
+    });
+    const volume = correctedRecords.filter((record) => record.type === 'strength' && record.measurement === 'reps')
       .reduce((sum, record) => sum + record.weight * record.reps * Math.max(1, record.setsCompleted), 0);
     const nextWorkout = {
       ...workout,
-      exercises: records.length,
-      sets: records.filter((record) => record.type === 'strength').reduce((sum, record) => sum + record.setsCompleted, 0),
+      exercises: correctedRecords.length,
+      sets: correctedRecords.filter((record) => record.type === 'strength').reduce((sum, record) => sum + record.setsCompleted, 0),
       volume,
-      cardioMinutes: records.filter((record) => record.type === 'cardio').reduce((sum, record) => sum + record.durationMinutes, 0),
-      distanceKm: records.filter((record) => record.type === 'cardio').reduce((sum, record) => sum + record.distanceKm, 0),
-      calories: records.filter((record) => record.type === 'cardio').reduce((sum, record) => sum + record.calories, 0),
+      cardioMinutes: correctedRecords.filter((record) => record.type === 'cardio').reduce((sum, record) => sum + record.durationMinutes, 0),
+      distanceKm: correctedRecords.filter((record) => record.type === 'cardio').reduce((sum, record) => sum + record.distanceKm, 0),
+      calories: correctedRecords.filter((record) => record.type === 'cardio').reduce((sum, record) => sum + record.calories, 0),
     };
     updateData((current) => ({
       ...current,
       workouts: current.workouts.map((item) => item.id === workout.id ? nextWorkout : item),
-      exerciseHistory: current.exerciseHistory.map((item) => recordIds.has(item.id) ? records.find((record) => record.id === item.id)! : item),
+      exerciseHistory: [
+        ...current.exerciseHistory.filter((item) => item.sessionId !== workout.id),
+        ...correctedRecords,
+      ],
     }), ['history']);
     setEditingWorkout(null);
     setToast(`${workout.name} corrections saved`);
@@ -873,7 +896,17 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
       {workoutOpen && active && <WorkoutModal workout={active} exerciseHistory={data.exerciseHistory} levelExercises={data.dayPlans.find((plan) => plan.day === active.planDay)?.exercises ?? []} levelResetAt={data.levelResetAt} profile={data.profile} finishedSets={finishedSets} totalSets={allSets.length} totalVolume={totalVolume} cardioMinutes={cardioMinutes} updateSet={updateSet} addSet={addSet} deleteSet={deleteSet} updateRestTimer={updateRestTimer} updateExerciseLoadMode={updateExerciseLoadMode} close={() => setWorkoutOpen(false)} discard={discardWorkout} complete={completeWorkout} />}
       {mealOpen && <MealModal date={selectedMealDate} draft={mealDraft} meal={editingMeal} scope={mealScope} close={() => { setMealOpen(false); setMealDraft(null); setEditingMeal(null); }} submit={saveMeal} />}
       {libraryOpen && <ExerciseLibraryModal plans={data.dayPlans} selectedDay={selectedPlanDay} setSelectedDay={setSelectedPlanDay} todayDay={todayDay} close={() => setLibraryOpen(false)} updatePlan={updatePlan} add={addExercise} update={updateExercise} remove={removeExercise} />}
-      {editingWorkout && <HistorySessionModal workout={editingWorkout} records={data.exerciseHistory.filter((record) => record.sessionId === editingWorkout.id)} close={() => setEditingWorkout(null)} save={saveWorkoutCorrection} />}
+      {editingWorkout && <HistorySessionModal
+        workout={editingWorkout}
+        records={data.exerciseHistory.filter((record) => record.sessionId === editingWorkout.id)}
+        plannedExercises={editingWorkout.plannedExercises?.length
+          ? editingWorkout.plannedExercises
+          : data.dayPlans.find((plan) => plan.day === editingWorkout.planDay)?.exercises
+            ?? data.dayPlans.find((plan) => plan.name === editingWorkout.name)?.exercises
+            ?? []}
+        close={() => setEditingWorkout(null)}
+        save={saveWorkoutCorrection}
+      />}
       {toast && <div className="toast" role="status"><Check size={16} />{toast}</div>}
     </main>
   );

@@ -461,8 +461,11 @@ button.nav-item.active { background: var(--soft); }
 .history-record-card { min-width: 0; margin: 0; padding: 12px 14px 14px; background: #fafafa; border: 1px solid var(--line); border-radius: 14px; }
 .history-record-card legend { max-width: calc(100% - 12px); display: inline-flex; align-items: center; gap: 8px; padding: 0 7px; color: var(--ink); font-size: 12px; font-weight: 600; line-height: 1.4; }
 .history-record-card legend span { width: 25px; height: 25px; flex: 0 0 25px; display: inline-grid; place-items: center; background: var(--ink); color: #fff; border-radius: 8px; font-size: 8px; font-variant-numeric: tabular-nums; }
+.history-record-card.missing { border-style: dashed; background: #fff; }
+.history-record-card legend em { padding: 4px 7px; background: #ededed; color: #777; border-radius: 999px; font-size: 8px; font-style: normal; letter-spacing: .08em; white-space: nowrap; }
+.history-record-missing-note { margin: 1px 0 7px; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .history-record-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-top: 5px; }
-.history-record-fields.cardio { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.history-record-fields.cardio { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .history-session-form input { min-width: 0; height: 48px; padding-inline: 14px; background: #fff; border-color: #dedede; border-radius: 12px; font-variant-numeric: tabular-nums; transition: border-color .18s ease, box-shadow .18s ease; }
 .history-session-form input:focus { border-color: #777; box-shadow: 0 0 0 3px rgba(39,39,39,.08); }
 .history-session-actions { position: sticky; z-index: 3; bottom: 0; margin: 2px -24px 0; padding: 14px 24px calc(18px + env(safe-area-inset-bottom)); background: rgba(247,247,247,.95); border-top: 1px solid var(--line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
@@ -715,7 +718,6 @@ button.nav-item.active { background: var(--soft); }
   .history-session-detail-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .history-session-date, .history-session-duration { grid-column: 1 / -1; }
   .history-record-fields, .history-record-fields.cardio { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .history-record-fields.cardio label:last-child { grid-column: 1 / -1; }
   .history-session-actions { margin-inline: -14px; padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); }
   .history-list-heading { display: grid; gap: 13px; }
   .history-export-actions { width: 100%; }

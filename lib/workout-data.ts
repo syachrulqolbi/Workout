@@ -51,6 +51,8 @@ export type WorkoutSession = {
   cardioMinutes: number;
   distanceKm: number;
   calories: number;
+  /** Immutable plan snapshot used to repair omitted exercise records later. */
+  plannedExercises?: LibraryExercise[];
 };
 
 export type ExerciseRecord = {
@@ -474,6 +476,9 @@ export function normalizeWorkoutData(value: unknown): WorkoutData {
       id: String(item.id ?? `session-${index}`), date: String(item.date ?? new Date().toISOString()), planDay: planDay(item.planDay), name: String(item.name ?? 'Workout'),
       focus: String(item.focus ?? ''), duration: nonNegative(item.duration, 0, 100_000), exercises: nonNegative(item.exercises, 0, 10_000), sets: nonNegative(item.sets, 0, 100_000), volume: nonNegative(item.volume, 0, 1_000_000_000),
       cardioMinutes: nonNegative(item.cardioMinutes, 0, 100_000), distanceKm: nonNegative(item.distanceKm, 0, 100_000), calories: nonNegative(item.calories, 0, 10_000_000),
+      plannedExercises: Array.isArray(item.plannedExercises)
+        ? item.plannedExercises.map((exercise, exerciseIndex) => normalizeLibraryExercise(exercise, `session-${index}-${exerciseIndex}`))
+        : undefined,
     };
   });
 
