@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import {
   CalendarDays, Check, Database, Dumbbell, LogIn,
 } from 'lucide-react';
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MobileNav, Sidebar, type SyncState, type View } from '@/features/workout/components/app-navigation';
 import { Dashboard } from '@/features/workout/components/dashboard';
 import { disableGoogleAutoSelect, GoogleSignInButton } from '@/features/workout/components/google-sign-in-button';
@@ -25,7 +25,7 @@ import { activeWorkoutVolume, bestCompletedSet } from '@/lib/workout-metrics';
 import { workoutMatchesPlan } from '@/lib/workout-identity';
 import { mergeWorkoutDataScopes } from '@/lib/workout-merge';
 import { workoutHistoryCsv, workoutHistoryJson } from '@/lib/workout-export';
-import { buildWorkout } from '@/lib/workout-session';
+import { buildWorkout, planWithNextWorkoutWeights } from '@/lib/workout-session';
 import {
   applyWorkoutCollectionChanges, applyWorkoutDataChanges, isWorkoutCollectionChanges, isWorkoutDataChanges,
   workoutCollectionChanges, workoutMainDataChanges, type ClientDataScope, type WorkoutCollectionChanges,
@@ -438,6 +438,10 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
   }, [toast]);
 
   const { planDay: todayPlanDay, plan: todayPlan } = workoutPlanForDate(todayKey, data.dayPlans, data.datePlanOverrides);
+  const todayPlanWithNextWeights = useMemo(
+    () => planWithNextWorkoutWeights(todayPlan, data.exerciseHistory, data.levelResetAt),
+    [todayPlan, data.exerciseHistory, data.levelResetAt],
+  );
   const todayMeals = mealsForDate(data.meals, todayKey);
   const selectedMeals = mealsForDate(data.meals, selectedMealDate);
   const completedToday = data.workouts.some((session) => localDateKey(new Date(session.date)) === todayKey && workoutMatchesPlan(session, todayPlanDay, todayPlan.name));
@@ -886,7 +890,7 @@ function WorkoutApp({ user, signOutUser }: { user: AppUser; signOutUser: () => v
       <section className="main-panel">
         {syncState === 'error' && <button className="sync-error-banner" onClick={() => enqueueSave(latestData.current, latestDirtyRevision.current, [...scopeRevisions.current.keys()])}><Database size={15} /> Save needs attention. Tap to retry.</button>}
         <header className="topbar"><div><span className="eyebrow">{heading.eyebrow}</span><h1>{heading.title}</h1></div><button className={`icon-button ${view === 'calendar' ? 'active' : ''}`} aria-label="Open calendar" onClick={() => navigate('calendar')}><CalendarDays size={20} /></button></header>
-        {view === 'today' && <Dashboard plan={todayPlan} dayPlans={data.dayPlans} scheduledDay={todayPlanDay} defaultDay={todayDay} meals={todayMeals} workouts={data.workouts} exerciseHistory={data.exerciseHistory} levelResetAt={data.levelResetAt} profile={data.profile} active={active} completedToday={completedToday} schedulePlan={(planDay) => schedulePlan(todayKey, planDay)} openWorkout={startOrResumeWorkout} openMeals={() => { setSelectedMealDate(todayKey); openNewMeal('date'); }} openLibrary={() => { setSelectedPlanDay(todayPlanDay >= 0 ? todayPlanDay : todayDay); setLibraryOpen(true); }} navigate={navigate} latestWorkout={data.workouts[0]} />}
+        {view === 'today' && <Dashboard plan={todayPlanWithNextWeights} dayPlans={data.dayPlans} scheduledDay={todayPlanDay} defaultDay={todayDay} meals={todayMeals} workouts={data.workouts} exerciseHistory={data.exerciseHistory} levelResetAt={data.levelResetAt} profile={data.profile} active={active} completedToday={completedToday} schedulePlan={(planDay) => schedulePlan(todayKey, planDay)} openWorkout={startOrResumeWorkout} openMeals={() => { setSelectedMealDate(todayKey); openNewMeal('date'); }} openLibrary={() => { setSelectedPlanDay(todayPlanDay >= 0 ? todayPlanDay : todayDay); setLibraryOpen(true); }} navigate={navigate} latestWorkout={data.workouts[0]} />}
         {view === 'history' && <HistoryView workouts={data.workouts} exerciseHistory={data.exerciseHistory} dayPlans={data.dayPlans} totalVolume={historyVolume} now={clock} goToday={() => navigate('today')} editWorkout={setEditingWorkout} deleteWorkout={deleteWorkout} downloadHistory={downloadHistory} historyHasMore={historyPage.hasMore} historyLoading={historyLoading || syncState !== 'synced'} loadOlderHistory={loadOlderHistory} />}
         {view === 'meals' && <MealsView todayKey={todayKey} selectedDate={selectedMealDate} meals={selectedMeals} toggleMeal={toggleMeal} addMeal={openNewMeal} editMeal={editMeal} deleteMeal={deleteMeal} openCalendar={() => navigate('calendar')} scanLabel={scanNutritionLabel} nutritionState={nutritionState} nutritionError={nutritionError} />}
         {view === 'calendar' && <CalendarView todayKey={todayKey} selectedDate={selectedMealDate} selectDate={(date) => setSelectedMealDate(date)} workouts={data.workouts} meals={data.meals} dayPlans={data.dayPlans} datePlanOverrides={data.datePlanOverrides} schedulePlan={schedulePlan} openMeals={() => navigate('meals')} />}
