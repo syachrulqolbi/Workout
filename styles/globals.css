@@ -167,13 +167,15 @@ strong, b { color: var(--title-color); }
 .body-map-title small { max-width: 55%; color: var(--muted); font-size: .75rem; line-height: 1.5; text-align: right; }
 .body-map-pair { display: flex; align-items: flex-end; justify-content: center; gap: clamp(12px, 5vw, 58px); margin-top: 8px; }
 .body-figure { width: min(42%, 170px); margin: 0; text-align: center; }
-.body-figure svg { display: block; width: 100%; height: 310px; overflow: visible; }
+.body-figure svg { display: block; width: 100%; height: auto; max-height: 330px; aspect-ratio: 1 / 2; overflow: visible; }
 .body-figure figcaption { margin-top: 2px; color: #8c8c8c; font-size: .75rem; font-weight: 600; letter-spacing: .14em; }
-.body-silhouette { fill: #eef0f1; stroke: #8e999f; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; }
-.anatomy-lines { fill: none; stroke: #b7bec2; stroke-width: .85; stroke-linecap: round; opacity: .85; }
-.muscle-region { fill: transparent; stroke: transparent; stroke-width: 1; transition: fill .25s ease, opacity .25s ease; }
-.muscle-region.primary { fill: var(--region-color, var(--muscle-color)); stroke: rgba(255,255,255,.88); opacity: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.12)); }
-.muscle-region.secondary { fill: var(--region-color, var(--muscle-color)); stroke: rgba(255,255,255,.72); opacity: .58; }
+.body-silhouette { fill: #f0f2f3; stroke: #879197; stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
+.body-detail-lines { fill: none; stroke: #aeb6ba; stroke-width: .72; stroke-linecap: round; opacity: .72; }
+.neutral-region { fill: #e2e6e8; stroke: rgba(255,255,255,.92); stroke-width: 1.05; stroke-linejoin: round; }
+.anatomy-lines { fill: none; stroke: #9ea7ab; stroke-width: .7; stroke-linecap: round; stroke-linejoin: round; opacity: .7; pointer-events: none; }
+.muscle-region { fill: #d9dee0; stroke: rgba(255,255,255,.94); stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; transition: fill .25s ease, opacity .25s ease, filter .25s ease; }
+.muscle-region.primary { fill: var(--region-color, var(--muscle-color)); stroke: rgba(255,255,255,.96); opacity: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.16)); }
+.muscle-region.secondary { fill: var(--region-color, var(--muscle-color)); stroke: rgba(255,255,255,.9); opacity: .56; }
 .muscle-key { display: flex; justify-content: center; gap: 20px; margin-top: 8px; color: var(--muted); font-size: .75rem; }
 .muscle-key span { display: inline-flex; align-items: center; gap: 7px; }
 .muscle-key i { width: 11px; height: 11px; background: var(--muscle-color); border: 1px solid rgba(0,0,0,.08); border-radius: 3px; }
@@ -271,7 +273,7 @@ strong, b { color: var(--title-color); }
   .muscle-card { padding: 21px; }
   .muscle-content { grid-template-columns: 1fr; }
   .body-map-panel { padding-inline: 16px; }
-  .body-figure svg { height: 250px; }
+  .body-figure svg { max-height: 300px; }
   .muscle-detail-panel { padding: 21px; }
   .quote-card { grid-template-columns: auto 1fr; }
   .quote-card span { display: none; }
@@ -284,7 +286,7 @@ strong, b { color: var(--title-color); }
   .body-map-title small { max-width: none; text-align: left; }
   .body-map-pair { gap: 4px; }
   .body-figure { width: 48%; }
-  .body-figure svg { height: 220px; }
+  .body-figure svg { max-height: 270px; }
   .level-metrics { grid-template-columns: 1fr; }
   .summary-level-metrics { grid-template-columns: 1fr 1fr; }
   .level-scale-heading { align-items: flex-start; flex-direction: column; gap: 3px; }

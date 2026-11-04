@@ -9,6 +9,7 @@ import {
 import { DAY_NAMES, type DayPlan, type ExerciseRecord, type LibraryExercise, type StrengthProfile } from '@/lib/workout-data';
 import { pullUpTargetSetup, requiredWorkingWeight } from '@/lib/strength-calculations';
 import { formatNumber } from '@/lib/workout-ui';
+import { BodyFigure } from '@/features/workout/components/body-figure';
 
 type SummaryMuscle = { group: MuscleGroup; score: number; direct: boolean; color: string };
 
@@ -227,58 +228,5 @@ function CardioDetail({ exercise }: { exercise: LibraryExercise }) {
       <div className="level-metrics"><div><span>DURATION</span><strong>{formatNumber(exercise.durationMinutes)} min</strong></div><div><span>TARGET</span><strong>{exercise.calories ? `${formatNumber(exercise.calories)} kcal` : exercise.distanceKm ? `${formatNumber(exercise.distanceKm)} km` : 'Time based'}</strong></div></div>
       <p>Cardio trains the highlighted muscles but is excluded from KG-based levels.</p>
     </div>
-  );
-}
-
-function BodyFigure({ view, muscles, colors }: { view: 'front' | 'back'; muscles: ExerciseMuscles; colors?: Partial<Record<MuscleGroup, string>> }) {
-  const region = (group: MuscleGroup) => ({
-    className: muscles.primary.includes(group) ? 'muscle-region primary' : muscles.secondary.includes(group) ? 'muscle-region secondary' : 'muscle-region',
-    style: colors?.[group] ? { '--region-color': colors[group] } as CSSProperties : undefined,
-  });
-
-  return (
-    <figure className="body-figure">
-      <svg viewBox="0 0 190 380" aria-hidden="true">
-        <g className="body-silhouette">
-          <path d="M95 8c-15 0-22 12-19 31l4 14c4 8 10 13 15 13s11-5 15-13l4-14c3-19-4-31-19-31z" />
-          <path d="M83 55l-2 19c-13 3-27 8-35 19l-13 55 13 4 14-47 5 72c7 12 18 20 30 20s23-8 30-20l5-72 14 47 13-4-13-55c-8-11-22-16-35-19l-2-19c-7 8-17 8-24 0z" />
-          <path d="M47 148l-13-3-13 55 10 3 18-37zM143 148l13-3 13 55-10 3-18-37z" />
-          <path d="M21 198l10 2 3 20-5 16-4-2 1-13-3 12-4-2 2-14-4 12-4-3 5-21zM169 198l-10 2-3 20 5 16 4-2-1-13 3 12 4-2-2-14 4 12 4-3-5-21z" />
-          <path d="M66 174c-5 20-5 39-2 59l9 55 16-1 6-77 6 77 16 1 9-55c3-20 3-39-2-59-18 15-40 15-58 0z" />
-          <path d="M73 283l16-1-1 61-10 27H65l5-26zM117 283l-16-1 1 61 10 27h13l-5-26z" />
-          <path d="M65 368h14l11 5v5H61zM125 368h-14l-11 5v5h29z" />
-        </g>
-        <g className="anatomy-lines">
-          <path d="M95 67v127M64 177q31 18 62 0M48 99l14 8M142 99l-14 8M73 288l15 8M117 288l-15 8" />
-        </g>
-        {view === 'front' ? (
-          <g>
-            <path {...region('shoulders')} d="M81 76c-14 1-25 5-32 15l9 15c8-8 15-11 23-12zM109 76c14 1 25 5 32 15l-9 15c-8-8-15-11-23-12z" />
-            <path {...region('chest')} d="M62 96c7-9 18-13 31-12v32c-15 3-27-2-35-10zM128 96c-7-9-18-13-31-12v32c15 3 27-2 35-10z" />
-            <path {...region('biceps')} d="M47 107c8 2 12 10 10 25l-8 23-10-4 3-30zM143 107c-8 2-12 10-10 25l8 23 10-4-3-30z" />
-            <path {...region('forearms')} d="M38 153l11 4-13 42-13-3zM152 153l-11 4 13 42 13-3z" />
-            <g {...region('abs')}><rect x="83" y="120" width="10" height="16" rx="4" /><rect x="97" y="120" width="10" height="16" rx="4" /><rect x="82" y="139" width="11" height="16" rx="4" /><rect x="97" y="139" width="11" height="16" rx="4" /><rect x="83" y="158" width="10" height="16" rx="4" /><rect x="97" y="158" width="10" height="16" rx="4" /></g>
-            <path {...region('obliques')} d="M64 116l16 4-2 52-12 8-6-34zM126 116l-16 4 2 52 12 8 6-34z" />
-            <path {...region('adductors')} d="M91 203h4l-5 78-12-53zM99 203h-4l5 78 12-53z" />
-            <path {...region('quads')} d="M69 199c8-3 15-1 22 5l-5 76-13 2-9-52zM121 199c-8-3-15-1-22 5l5 76 13 2 9-52z" />
-            <path {...region('calves')} d="M72 292c8 1 13 9 13 25l-9 43-9 1 3-33zM118 292c-8 1-13 9-13 25l9 43 9 1-3-33z" />
-          </g>
-        ) : (
-          <g>
-            <path {...region('rearDelts')} d="M81 77c-13 1-24 5-32 15l9 14c8-7 15-11 23-12zM109 77c13 1 24 5 32 15l-9 14c-8-7-15-11-23-12z" />
-            <path {...region('traps')} d="M84 68c6 8 16 8 22 0l18 17-29 34-29-34z" />
-            <path {...region('upperBack')} d="M61 98l31 20-15 31-20-36zM129 98l-31 20 15 31 20-36z" />
-            <path {...region('lats')} d="M58 110l19 40-8 31-12-15-3-42zM132 110l-19 40 8 31 12-15 3-42z" />
-            <path {...region('triceps')} d="M47 107c8 2 12 10 10 25l-8 23-10-4 3-30zM143 107c-8 2-12 10-10 25l8 23 10-4-3-30z" />
-            <path {...region('forearms')} d="M38 153l11 4-13 42-13-3zM152 153l-11 4 13 42 13-3z" />
-            <path {...region('lowerBack')} d="M77 150h36l8 31-26 15-26-15z" />
-            <path {...region('glutes')} d="M66 190c11-6 21-5 28 5l-2 29c-15 8-25 3-29-8zM124 190c-11-6-21-5-28 5l2 29c15 8 25 3 29-8z" />
-            <path {...region('hamstrings')} d="M66 226c9-5 18-3 26 1l-6 54-13 1-9-50zM124 226c-9-5-18-3-26 1l6 54 13 1 9-50z" />
-            <path {...region('calves')} d="M72 292c8 1 13 9 13 25l-9 43-9 1 3-33zM118 292c-8 1-13 9-13 25l9 43 9 1-3-33z" />
-          </g>
-        )}
-      </svg>
-      <figcaption>{view.toUpperCase()}</figcaption>
-    </figure>
   );
 }
